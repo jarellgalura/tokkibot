@@ -117,7 +117,7 @@ async def retrieve_instagram_media(message):
             caption_message = f"{caption_with_info}\n<{url}>"
 
             # Send media files along with caption and URL in a single message
-            await message.channel.send(content=caption_message, files=media_files)
+            await message.reply(content=caption_with_info, files=media_files, allowed_mentions=discord.AllowedMentions.none())
 
             # Delete the original Instagram link message
             await message.delete()
