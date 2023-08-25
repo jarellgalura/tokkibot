@@ -98,11 +98,11 @@ async def retrieve_instagram_media(message):
                 tasks.append(get_media_data(session, media_url))
             media_data_results = await asyncio.gather(*tasks)
 
-            media_files = []
-          for index, media_data in enumerate(media_data_results, start=1):
-    if media_data is None:
-        await message.channel.send("An error occurred while retrieving media.")
-        return
+        media_files = []
+        for index, media_data in enumerate(media_data_results, start=1):
+            if media_data is None:
+                await message.channel.send("An error occurred while retrieving media.")
+                return
 
     # Convert HEIC images to JPEG
     if media_urls[index - 1].endswith(".heic"):
