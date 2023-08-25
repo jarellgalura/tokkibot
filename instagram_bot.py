@@ -6,10 +6,19 @@ import tempfile
 import asyncio
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, urljoin
+from pypresence import Presence
 
+# Your Discord bot token
+DISCORD_TOKEN = "MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk"
+
+# Initialize Discord client
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
+
+# Initialize Discord Rich Presence
+RPC = Presence("1144164388157272137")  # Replace with your actual client ID
+RPC.connect()
 
 # Define cooldown duration (in seconds)
 COOLDOWN_DURATION = 5
@@ -22,8 +31,6 @@ user_last_link_time = {}
 async def on_ready():
     print(f'Logged in as {client.user.name}')
 
-    await client.change_presence(activity=discord.Game(name="phoning"))
-
 
 async def get_media_data(session, url):
     try:
@@ -33,25 +40,6 @@ async def get_media_data(session, url):
     except aiohttp.ClientError as e:
         print(f"Error during HTTP request: {e}")
         return None
-
-
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
-
-    if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
-        user_id = message.author.id
-        current_time = datetime.now()
-
-        if user_id in user_last_link_time:
-            time_since_last_link = current_time - user_last_link_time[user_id]
-            if time_since_last_link < timedelta(seconds=COOLDOWN_DURATION):
-                await message.channel.send("Please wait before sending another link.")
-                return
-
-        user_last_link_time[user_id] = current_time
-        await retrieve_instagram_media(message)
 
 
 async def retrieve_instagram_media(message):
@@ -126,5 +114,31 @@ async def retrieve_instagram_media(message):
             # Delete the original Instagram link message
             await message.delete()
 
-client.run(
-    "MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk")
+    # Update Discord Rich Presence to "Idle"
+    RPC.update(
+        state="Idle",
+        details="Chatting",
+        start=int(datetime.now().timestamp())
+    )
+
+
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
+
+    if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
+        user_id = message.author.id
+        current_time = datetime.now()
+
+        if user_id in user_last_link_time:
+            time_since_last_link = current_time - user_last_link_time[user_id]
+            if time_since_last_link < timedelta(seconds=COOLDOWN_DURATION):
+                await message.channel.send("Please wait before sending another link.")
+                return
+
+        user_last_link_time[user_id] = current_time
+        await retrieve_instagram_media(message)
+
+
+client.run(DISCORD_TOKEN)
