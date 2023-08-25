@@ -6,7 +6,6 @@ import tempfile
 import asyncio
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, urljoin
-from PIL import Image
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -98,29 +97,25 @@ async def retrieve_instagram_media(message):
                 tasks.append(get_media_data(session, media_url))
             media_data_results = await asyncio.gather(*tasks)
 
-        media_files = []
-        for index, media_data in enumerate(media_data_results, start=1):
-            if media_data is None:
-                await message.channel.send("An error occurred while retrieving media.")
-                return
+            media_files = []
+            for index, media_data in enumerate(media_data_results, start=1):
+                if media_data is None:
+                    await message.channel.send("An error occurred while retrieving media.")
+                    return
 
-    # Convert HEIC images to JPEG
-    if media_urls[index - 1].endswith(".heic"):
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".jpg") as tmp_file:
-            img = Image.open(io.BytesIO(media_data))
-            img.save(tmp_file, format="JPEG")
-            tmp_file.seek(0)
-            media_files.append(discord.File(tmp_file, filename=f"media{index}.jpg"))
-    else:
-        with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
-            tmp_file.write(media_data)
-            tmp_file.seek(0)
-            temp_path = os.path.join(tempfile.gettempdir(), f'{index:02d}{os.path.splitext(urlparse(media_urls[index - 1]).path)[1]}')
-            with open(temp_path, 'wb') as f:
-                f.write(tmp_file.read())
-            media_files.append(discord.File(temp_path))
+                with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
+                    tmp_file.write(media_data)
+                    tmp_file.seek(0)
+                    temp_path = os.path.join(tempfile.gettempdir(),
+                                             f'{index:02d}{os.path.splitext(urlparse(media_urls[index - 1]).path)[1]}')
+                    with open(temp_path, 'wb') as f:
+                        f.write(tmp_file.read())
+                    media_files.append(discord.File(temp_path))
 
-            # Combine caption and shortened link
+            # Construct the shortened link
+            shortened_link = urljoin(url, url.split('?')[0])
+
+            # Combine caption, shortened link, and media files
             caption_message = f"{caption_with_info}\n<{shortened_link}>"
 
             # Send media files along with caption and shortened link in a single message
