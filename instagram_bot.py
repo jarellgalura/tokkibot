@@ -113,7 +113,7 @@ async def retrieve_instagram_media(message):
                     media_files.append(discord.File(temp_path))
 
             # Combine caption and URL with media files
-            caption_message = f"{caption_with_info}\n<{url}>"
+            caption_message = f"{caption_with_info}>"
 
             # Send media files along with caption and URL in a single message
             await message.reply(content=caption_with_info, files=media_files, allowed_mentions=discord.AllowedMentions.none())
