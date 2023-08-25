@@ -22,7 +22,7 @@ user_last_link_time = {}
 async def on_ready():
     print(f'Logged in as {client.user.name}')
 
-await client.change_presence(activity=discord.Game(name="phoning"))
+    await client.change_presence(activity=discord.Game(name="phoning"))
 
 
 async def get_media_data(session, url):
