@@ -125,5 +125,4 @@ async def retrieve_instagram_media(message):
             # Delete the original Instagram link message
             await message.delete()
 
-client.run(
-    'MTE0NDE2NDM4ODE1NzI3MjEzNw.GvN02l.IsijsZ99vKS0CMuAXdGGgHcJ50DBYNnE_r9Dmk')
+client.run(BOT_TOKEN)
