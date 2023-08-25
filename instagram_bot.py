@@ -84,6 +84,9 @@ async def retrieve_instagram_media(message):
 
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption}"
+    
+    # Construct the shortened link
+    shortened_link = urljoin(url, url.split('?')[0])
 
     async with aiohttp.ClientSession() as session:
         # Display typing status while processing
@@ -112,11 +115,11 @@ async def retrieve_instagram_media(message):
                         f.write(tmp_file.read())
                     media_files.append(discord.File(temp_path))
 
-            # Combine caption and URL with media files
-            caption_message = f"{caption_with_info}>"
+            # Combine caption, shortened link, and media files
+            caption_message = f"{caption_with_info}\n<{shortened_link}>"
 
-            # Send media files along with caption and URL in a single message
-            await message.reply(content=caption_with_info, files=media_files, allowed_mentions=discord.AllowedMentions.none())
+            # Send media files along with caption and shortened link in a single message
+            await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
 
             # Delete the original Instagram link message
             await message.delete()
