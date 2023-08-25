@@ -5,7 +5,7 @@ import os
 import tempfile
 import asyncio
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -112,11 +112,14 @@ async def retrieve_instagram_media(message):
                         f.write(tmp_file.read())
                     media_files.append(discord.File(temp_path))
 
-            # Combine caption and URL with media files
-            caption_message = f"{caption_with_info}\n<{url}>"
+            # Construct the shortened link
+            shortened_link = urljoin(url, url.split('?')[0])
 
-            # Send media files along with caption and URL in a single message
-            await message.reply(content=caption_with_info, files=media_files, allowed_mentions=discord.AllowedMentions.none())
+            # Combine caption, shortened link, and media files
+            caption_message = f"{caption_with_info}\n{shortened_link}"
+
+            # Send media files along with caption and shortened link in a single message
+            await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
 
             # Delete the original Instagram link message
             await message.delete()
