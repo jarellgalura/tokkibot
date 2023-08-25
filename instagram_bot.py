@@ -120,11 +120,11 @@ async def retrieve_instagram_media(message):
                 f.write(tmp_file.read())
             media_files.append(discord.File(temp_path))
 
-# Combine caption and shortened link
-caption_message = f"{caption_with_info}\n<{shortened_link}>"
+            # Combine caption and shortened link
+            caption_message = f"{caption_with_info}\n<{shortened_link}>"
 
-# Send media files along with caption and shortened link in a single message
-await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
+            # Send media files along with caption and shortened link in a single message
+            await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
 
             # Delete the original Instagram link message
             await message.delete()
