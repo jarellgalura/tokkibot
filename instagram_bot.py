@@ -116,7 +116,7 @@ async def retrieve_instagram_media(message):
             shortened_link = urljoin(url, url.split('?')[0])
 
             # Combine caption, shortened link, and media files
-            caption_message = f"{caption_with_info}\n{shortened_link}"
+            caption_message = f"{caption_with_info}\n<{shortened_link}>"
 
             # Send media files along with caption and shortened link in a single message
             await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
