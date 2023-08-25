@@ -6,14 +6,10 @@ import tempfile
 import asyncio
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
-from io import BytesIO
-from dotenv import load_dotenv
 
-load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
-BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 # Define cooldown duration (in seconds)
 COOLDOWN_DURATION = 5
@@ -125,4 +121,4 @@ async def retrieve_instagram_media(message):
             # Delete the original Instagram link message
             await message.delete()
 
-client.run(BOT_TOKEN)
+client.run("MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk")
