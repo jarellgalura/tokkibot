@@ -7,10 +7,13 @@ import asyncio
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from io import BytesIO
+from dotenv import load_dotenv
 
+load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 # Define cooldown duration (in seconds)
 COOLDOWN_DURATION = 5
