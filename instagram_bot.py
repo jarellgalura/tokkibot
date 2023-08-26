@@ -41,12 +41,16 @@ async def on_message(message):
                         temp_file.write(video_content)
                         temp_file.seek(0)
 
+                        # Remove hashtags from the description
+                        description_without_hashtags = re.sub(
+                            r'#\w+', '', tiktok_video.description)
+
                         # Create a File object from the temporary file
                         video_file = discord.File(temp_file.name)
                         tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
                         response = (
                             f"{tiktok_emote_syntax} @{tiktok_video.user}\n\n"
-                            f"{tiktok_video.description}"
+                            f"{description_without_hashtags}"
                         )
 
                         # Send the response to the user without mentioning them
@@ -79,6 +83,10 @@ async def retrieve_instagram_media(message):
     username = post.owner_username
     post_date = post.date.strftime('%Y-%m-%d %H:%M:%S')
     caption = post.caption if post.caption else "No caption available."
+
+    # Remove hashtags from the caption
+    caption_without_hashtags = re.sub(r'#\w+', '', caption).strip()
+
     media_urls = []
 
     if post.typename == 'GraphImage':
@@ -100,7 +108,7 @@ async def retrieve_instagram_media(message):
             media_urls.append(post.url)
 
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
-    caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption}"
+    caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
 
     async with aiohttp.ClientSession() as session:
         # Display typing status while processing
