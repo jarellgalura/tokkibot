@@ -28,13 +28,12 @@ class TikTokVideo:
 
 
 def error_code_to_message(error_code):
-    match error_code:
-        case "tiktok":
-            return "URL redirected to tiktok home page."
-        case "Video is private!":
-            return "Video is private or unavailable"
-        case _:
-            return error_code
+    if error_code == "tiktok":
+        return "URL redirected to tiktok home page."
+    elif error_code == "Video is private!":
+        return "Video is private or unavailable"
+    else:
+        return error_code
 
 
 class TikTok:
