@@ -1,44 +1,58 @@
-import discord
-import instaloader
-import aiohttp
-import os
-import tempfile
 import asyncio
-from datetime import datetime, timedelta
-from urllib.parse import urlparse, urljoin
+import discord
+import threading
+import instaloader
+import re
+
+# Import the TikTok script
+from tiktok_bot import TikTok
+
+# Import the Instagram script
+from instagram_bot import *
+
+# Your bot's token
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk'
 
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-# Define cooldown duration (in seconds)
-COOLDOWN_DURATION = 5
-
-# Store last link message timestamp per user
-user_last_link_time = {}
-
-
-@client.event
-async def on_ready():
-    print(f'Logged in as {client.user.name}')
-
-    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
-
-
-async def get_media_data(session, url):
-    try:
-        async with session.get(url) as response:
-            response.raise_for_status()
-            return await response.read()
-    except aiohttp.ClientError as e:
-        print(f"Error during HTTP request: {e}")
-        return None
+# Instantiate the TikTok class
+tiktok = TikTok()
 
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
+
+    tiktok_pattern = r'https?://(?:www\.)?tiktok\.com/.+'
+    tiktok_urls = re.findall(tiktok_pattern, message.content)
+
+    async with aiohttp.ClientSession() as session:
+        for tiktok_url in tiktok_urls:
+            try:
+                tiktok_video = await tiktok.get_video(tiktok_url)
+                video_content = await tiktok.download_video_content(tiktok_video.video_url, session)
+                async with message.channel.typing():
+                    # Create a temporary file using tempfile.NamedTemporaryFile
+                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
+                        temp_file.write(video_content)
+                        temp_file.seek(0)
+
+                        # Create a File object from the temporary file
+                        video_file = discord.File(temp_file.name)
+                        tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
+                        response = (
+                            f"{tiktok_emote_syntax} @{tiktok_video.user}\n\n"
+                            f"{tiktok_video.description}"
+                        )
+
+                        # Send the response to the user without mentioning them
+                        await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
+
+            except Exception as e:
+                await message.channel.send(f"An error occurred: {e}")
 
     if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
         user_id = message.author.id
@@ -125,3 +139,31 @@ async def retrieve_instagram_media(message):
 
             # Delete the original Instagram link message
             await message.delete()
+
+
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user.name}')
+
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
+
+
+def run_discord_bot():
+    client.run(TOKEN)
+
+
+def run_instagram_script():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(client.start(TOKEN))
+
+
+if __name__ == '__main__':
+    discord_thread = threading.Thread(target=run_discord_bot)
+    instagram_thread = threading.Thread(target=run_instagram_script)
+
+    discord_thread.start()
+    instagram_thread.start()
+
+    discord_thread.join()
+    instagram_thread.join()
