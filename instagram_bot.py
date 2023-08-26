@@ -19,6 +19,8 @@ client = discord.Client(intents=intents)
 
 # Instantiate the TikTok class
 tiktok = TikTok()
+loop = asyncio.get_event_loop()
+L = instaloader.Instaloader()
 
 
 @client.event
@@ -149,21 +151,8 @@ async def on_ready():
 
 
 def run_discord_bot():
-    client.run(TOKEN)
-
-
-def run_instagram_script():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     loop.run_until_complete(client.start(TOKEN))
 
 
 if __name__ == '__main__':
-    discord_thread = threading.Thread(target=run_discord_bot)
-    instagram_thread = threading.Thread(target=run_instagram_script)
-
-    discord_thread.start()
-    instagram_thread.start()
-
-    discord_thread.join()
-    instagram_thread.join()
+    run_discord_bot()
