@@ -5,10 +5,10 @@ import instaloader
 import re
 
 # Import the TikTok script
-from modules.tiktok_bot import TikTok
+from tiktok_bot import TikTok
 
 # Import the Instagram script
-from modules.instagram_bot import *
+from instagram_bot import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk'
