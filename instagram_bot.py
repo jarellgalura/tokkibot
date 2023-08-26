@@ -51,7 +51,7 @@ async def on_message(message):
 
                         # Send the response to the user without mentioning them
                         await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
-
+                        await message.edit(suppress=True)
             except Exception as e:
                 await message.channel.send(f"An error occurred: {e}")
 
