@@ -8,7 +8,7 @@ import re
 from tiktok_bot import TikTok
 
 # Import the Instagram script
-from instagram_bot import *
+from hanniinstagram import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk'
