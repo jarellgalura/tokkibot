@@ -21,63 +21,49 @@ user_last_link_time = {}
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
+
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
 
-    # Register application commands for all guilds
-    for guild in client.guilds:
-        commands = [
-            {
-                "name": "retrieve_instagram",
-                "description": "Retrieve media from an Instagram link",
-                "type": 1,  # Slash command
-                "options": [
-                    {
-                        "name": "url",
-                        "description": "The Instagram link",
-                        "type": 3,  # String type
-                        "required": True
-                    },
-                    {
-                        "name": "include_caption",
-                        "description": "Include caption? (yes/no)",
-                        "type": 3,  # String type
-                        "required": False
-                    }
-                ]
-            }
-        ]
 
-        await client.http.bulk_upsert_guild_commands(client.user.id, guild.id, commands)
+async def get_media_data(session, url):
+    try:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            return await response.read()
+    except aiohttp.ClientError as e:
+        print(f"Error during HTTP request: {e}")
+        return None
 
 
 @client.event
-async def on_interaction(interaction):
-    if isinstance(interaction, discord.Interaction):
-        if interaction.type == discord.InteractionType.application_command:
-            command = interaction.data["name"]
+async def on_message(message):
+    if message.author == client.user:
+        return
 
-            if command == "retrieve_instagram":
-                await interaction.response.defer()
+    if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
+        user_id = message.author.id
+        current_time = datetime.now()
 
-                url = interaction.data["options"][0]["value"]
-                include_caption_option = interaction.data["options"][1] if len(
-                    interaction.data["options"]) > 1 else None
+        if user_id in user_last_link_time:
+            time_since_last_link = current_time - user_last_link_time[user_id]
+            if time_since_last_link < timedelta(seconds=COOLDOWN_DURATION):
+                await message.channel.send("Please wait before sending another link.")
+                return
 
-                await retrieve_instagram_media(interaction, url, include_caption_option)
+        user_last_link_time[user_id] = current_time
+        await retrieve_instagram_media(message)
 
 
-async def retrieve_instagram_media(interaction, url, include_caption_option):
+async def retrieve_instagram_media(message):
+    url = message.content.split()[0]
     shortcode = url.split('/')[-2]
+
     L = instaloader.Instaloader()
     post = instaloader.Post.from_shortcode(L.context, shortcode)
 
     username = post.owner_username
     post_date = post.date.strftime('%Y-%m-%d %H:%M:%S')
     caption = post.caption if post.caption else "No caption available."
-
-    if include_caption_option and include_caption_option["value"].lower() == "no":
-        caption = ""
-
     media_urls = []
 
     if post.typename == 'GraphImage':
@@ -103,7 +89,7 @@ async def retrieve_instagram_media(interaction, url, include_caption_option):
 
     async with aiohttp.ClientSession() as session:
         # Display typing status while processing
-        async with interaction.channel.typing():
+        async with message.channel.typing():
             # Rest of your media retrieval and sending code
             tasks = []
             media_data_results = []
@@ -116,7 +102,7 @@ async def retrieve_instagram_media(interaction, url, include_caption_option):
             media_files = []
             for index, media_data in enumerate(media_data_results, start=1):
                 if media_data is None:
-                    await interaction.followup.send("An error occurred while retrieving media.")
+                    await message.channel.send("An error occurred while retrieving media.")
                     return
 
                 with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
@@ -132,23 +118,13 @@ async def retrieve_instagram_media(interaction, url, include_caption_option):
             shortened_link = urljoin(url, url.split('?')[0])
 
             # Combine caption, shortened link, and media files
-            if include_caption_option and include_caption_option["value"].lower() == "yes":
-                caption_message = f"{caption_with_info}\n\n{shortened_link}"
-            else:
-                caption_message = f"{caption_with_info}"
+            caption_message = f"{caption_with_info}\n<{shortened_link}>"
 
             # Send media files along with caption and shortened link in a single message
-            await interaction.followup.send(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
+            await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
 
-
-async def get_media_data(session, url):
-    try:
-        async with session.get(url) as response:
-            response.raise_for_status()
-            return await response.read()
-    except aiohttp.ClientError as e:
-        print(f"Error during HTTP request: {e}")
-        return None
+            # Delete the original Instagram link message
+            await message.delete()
 
 client.run(
     "MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk")
