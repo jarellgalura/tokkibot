@@ -27,7 +27,7 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    tiktok_pattern = r'https?://(?:www\.)?(?:tiktok\.com|vt\.tiktok\.com)/.+'
+    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/.+'
     tiktok_urls = re.findall(tiktok_pattern, message.content)
 
     async with aiohttp.ClientSession() as session:
