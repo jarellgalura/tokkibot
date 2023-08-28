@@ -2,6 +2,8 @@ import asyncio
 import discord
 import instaloader
 import re
+from PIL import Image
+import io
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -73,6 +75,16 @@ async def on_message(message):
         await retrieve_instagram_media(message)
 
 
+async def convert_heic_to_jpg(heic_data):
+    with tempfile.NamedTemporaryFile(delete=True, suffix='.jpg') as tmp_file:
+        # Open the HEIC data using PIL and save as JPEG
+        img = Image.open(io.BytesIO(heic_data))
+        img = img.convert("RGB")
+        img.save(tmp_file, "JPEG")
+        tmp_file.seek(0)
+        return tmp_file.read()
+
+
 async def retrieve_instagram_media(message):
     url = message.content.split()[0]
     shortcode = url.split('/')[-2]
@@ -127,6 +139,13 @@ async def retrieve_instagram_media(message):
                 if media_data is None:
                     await message.channel.send("An error occurred while retrieving media.")
                     return
+
+                # Convert HEIC to JPEG if the media is in HEIC format
+                if os.path.splitext(urlparse(media_urls[index - 1]).path)[1].lower() == '.heic':
+                    media_data = await convert_heic_to_jpg(media_data)
+                    # Update the media URL to use the new JPEG format
+                    media_urls[index - 1] = media_urls[index -
+                                                       1].replace('.heic', '.jpg')
 
                 with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
                     tmp_file.write(media_data)
