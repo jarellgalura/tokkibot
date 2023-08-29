@@ -21,7 +21,6 @@ client = discord.Client(intents=intents)
 # Instantiate the TikTok class
 tiktok = TikTok()
 L = instaloader.Instaloader()
-loop = asyncio.get_event_loop()
 
 
 @client.event
@@ -177,7 +176,7 @@ async def on_ready():
 
 
 def run_discord_bot():
-    loop.run_until_complete(client.start(TOKEN))
+    asyncio.run(client.start(TOKEN))
 
 
 if __name__ == '__main__':
