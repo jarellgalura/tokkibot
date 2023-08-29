@@ -12,7 +12,7 @@ from tiktok_bot import TikTok
 from hanniinstagram import *
 
 # Your bot's token
-TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G8tkPl.8d3HLrHy0S-7kuk7l0nDl-urBpxzWc2w-4gjWk'
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.GLgAfR.AI0TW9r1S5tn8LPhggpCjaP-Xb_RNYInYFjDe8'
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -88,7 +88,6 @@ async def retrieve_instagram_media(message):
     url = message.content.split()[0]
     shortcode = url.split('/')[-2]
 
-    L = instaloader.Instaloader()
     post = instaloader.Post.from_shortcode(L.context, shortcode)
 
     username = post.owner_username

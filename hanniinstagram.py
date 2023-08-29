@@ -10,6 +10,7 @@ from urllib.parse import urlparse, urljoin
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
+L = instaloader.Instaloader()
 
 # Define cooldown duration (in seconds)
 COOLDOWN_DURATION = 5
