@@ -13,6 +13,8 @@ from hanniinstagram import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.GLgAfR.AI0TW9r1S5tn8LPhggpCjaP-Xb_RNYInYFjDe8'
+INSTAGRAM_USERNAME = 'praychandesu'
+INSTAGRAM_PASSWORD = 'jcdg120899'
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -170,6 +172,20 @@ async def retrieve_instagram_media(message):
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
+
+    # Login to Instagram using instaloader
+    try:
+        L.load_session_from_file(INSTAGRAM_USERNAME)
+    except FileNotFoundError:
+        L.context.log("Session file does not exist yet - Logging in.")
+        L.context.log(
+            "If you have not logged in yet, you will be asked for your Instagram credentials.")
+        L.context.log(
+            "If you have chosen the 'Remember me' option while logging in, the session file will be created and you won't have to log in again next time.")
+        pass
+    except Exception as e:
+        L.context.log(f"Error while loading session: {e}")
+        pass
 
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
 
