@@ -12,9 +12,7 @@ from tiktok_bot import TikTok
 from hanniinstagram import *
 
 # Your bot's token
-TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.GLgAfR.AI0TW9r1S5tn8LPhggpCjaP-Xb_RNYInYFjDe8'
-INSTAGRAM_USERNAME = 'praychandesu'
-INSTAGRAM_PASSWORD = 'jcdg120899'
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G1r_lp.BxIzRaqOJQ9aRHnEsXd3LRnpkPFHTHh8cwysWw'
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -122,7 +120,8 @@ async def retrieve_instagram_media(message):
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'
+    }
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
@@ -173,20 +172,6 @@ async def retrieve_instagram_media(message):
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
-
-    # Login to Instagram using instaloader
-    try:
-        L.load_session_from_file(INSTAGRAM_USERNAME)
-    except FileNotFoundError:
-        L.context.log("Session file does not exist yet - Logging in.")
-        L.context.log(
-            "If you have not logged in yet, you will be asked for your Instagram credentials.")
-        L.context.log(
-            "If you have chosen the 'Remember me' option while logging in, the session file will be created and you won't have to log in again next time.")
-        pass
-    except Exception as e:
-        L.context.log(f"Error while loading session: {e}")
-        pass
 
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
 
