@@ -13,8 +13,6 @@ from hanniinstagram import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G1r_lp.BxIzRaqOJQ9aRHnEsXd3LRnpkPFHTHh8cwysWw'
-INSTAGRAM_USERNAME = 'praychandesu'
-INSTAGRAM_PASSWORD = 'jcdg120899'
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -171,13 +169,25 @@ async def retrieve_instagram_media(message):
             await message.delete()
 
 
+INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
+INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
+
+# Create an Instaloader context with the desired session file name
+L = instaloader.Instaloader(filename_pattern="session-{username}")
+
+# ... (Rest of your code)
+
+
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
 
-    # Login to Instagram using instaloader
+    # Load or create a session
+    session_file_path = os.path.join(
+        INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
     try:
-        L.load_session_from_file(INSTAGRAM_USERNAME)
+        L.load_session_from_file(
+            INSTAGRAM_USERNAME, filename=session_file_path)
     except FileNotFoundError:
         L.context.log("Session file does not exist yet - Logging in.")
         L.context.log(
