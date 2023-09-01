@@ -18,3 +18,4 @@ yarl==1.9.2
 pypresence==4.3.0
 lxml==4.9.3
 Pillow==9.5.0
+aiosqlite==0.17.0

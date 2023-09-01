@@ -175,8 +175,6 @@ INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(filename_pattern="session-{username}")
 
-# ... (Rest of your code)
-
 
 @client.event
 async def on_ready():
