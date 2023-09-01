@@ -4,12 +4,16 @@ import instaloader
 import re
 from PIL import Image
 import io
+import os
+import tempfile
+import asyncio
+from datetime import datetime, timedelta
+from urllib.parse import urlparse, urljoin
+import aiohttp
 
 # Import the TikTok script
 from tiktok_bot import TikTok
 
-# Import the Instagram script
-from hanniinstagram import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G1r_lp.BxIzRaqOJQ9aRHnEsXd3LRnpkPFHTHh8cwysWw'
@@ -21,6 +25,11 @@ client = discord.Client(intents=intents)
 # Instantiate the TikTok class
 tiktok = TikTok()
 L = instaloader.Instaloader()
+# Define cooldown duration (in seconds)
+COOLDOWN_DURATION = 5
+
+# Store last link message timestamp per user
+user_last_link_time = {}
 
 
 @client.event
@@ -125,7 +134,6 @@ async def retrieve_instagram_media(message):
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
-            # Rest of your media retrieval and sending code
             tasks = []
             media_data_results = []
 
@@ -170,10 +178,21 @@ async def retrieve_instagram_media(message):
 
 
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
+INSTAGRAM_USERNAME = "jarellgalura"  # Replace with your Instagram username
 
 # Create an Instaloader context with the desired session file name
-L = instaloader.Instaloader(filename_pattern="session-{username}")
+L = instaloader.Instaloader(
+    filename_pattern="session-{username}", max_connection_attempts=1)
+
+
+async def get_media_data(session, url):
+    try:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            return await response.read()
+    except aiohttp.ClientError as e:
+        print(f"Error during HTTP request: {e}")
+        return None
 
 
 @client.event
