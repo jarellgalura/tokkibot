@@ -21,10 +21,10 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
-    # Check if the bot was mentioned in the message
-    if bot.user.mentioned_in(message):
+    # Check if the bot was mentioned at the beginning of the message
+    if message.content.startswith(bot.user.mention):
         # Extract the text after the mention
-        mentioned_text = message.content.replace(bot.user.mention, '').strip()
+        mentioned_text = message.content[len(bot.user.mention):].strip()
 
         # Translate text using the 'mtranslate' library
         translated_text = mtranslate(mentioned_text)
