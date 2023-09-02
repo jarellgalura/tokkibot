@@ -32,6 +32,9 @@ async def on_message(message):
         # Send the translation
         await message.channel.send(f'{translated_text}')
 
+    # Process commands
+    await bot.process_commands(message)
+
 # Function to perform translation using the 'mtranslate' library
 
 
