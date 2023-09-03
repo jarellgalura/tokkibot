@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from mtranslate import translate
+
 
 # Define the custom command prefix
 intents = discord.Intents.all()
@@ -13,35 +13,3 @@ bot = commands.Bot(
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
-
-
-@bot.event
-async def on_message(message):
-    # Avoid responding to the bot's own messages to prevent loops
-    if message.author == bot.user:
-        return
-
-    # Check if the bot was mentioned at the beginning of the message
-    if message.content.startswith(bot.user.mention):
-        # Extract the text after the mention
-        mentioned_text = message.content[len(bot.user.mention):].strip()
-
-        # Translate text using the 'mtranslate' library
-        translated_text = mtranslate(mentioned_text)
-
-        # Send the translation
-        await message.channel.send(f'{translated_text}')
-
-    # Process commands
-    await bot.process_commands(message)
-
-# Function to perform translation using the 'mtranslate' library
-
-
-def mtranslate(text):
-    translated_text = translate(text, 'en', 'auto')
-    return translated_text
-
-
-# Run the bot with your Discord token
-bot.run('MTE0NDE2NDM4ODE1NzI3MjEzNw.G1r_lp.BxIzRaqOJQ9aRHnEsXd3LRnpkPFHTHh8cwysWw')

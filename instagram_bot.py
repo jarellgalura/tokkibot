@@ -10,6 +10,9 @@ import asyncio
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, urljoin
 import aiohttp
+import time
+from kr_eng import *
+from mtranslate import translate
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -68,6 +71,30 @@ async def on_message(message):
                         await message.edit(suppress=True)
             except Exception as e:
                 await message.channel.send(f"An error occurred: {e}")
+
+        # Avoid responding to the bot's own messages to prevent loops
+    if message.author == bot.user:
+        return
+
+    # Check if the bot was mentioned at the beginning of the message
+    if message.content.startswith(bot.user.mention):
+        # Extract the text after the mention
+        mentioned_text = message.content[len(bot.user.mention):].strip()
+
+        # Translate text using the 'mtranslate' library
+        translated_text = mtranslate(mentioned_text)
+
+        # Send the translation
+        await message.channel.send(f'{translated_text}')
+
+    # Process commands
+    await bot.process_commands(message)
+
+# Function to perform translation using the 'mtranslate' library
+
+    def mtranslate(text):
+        translated_text = translate(text, 'en', 'auto')
+        return translated_text
 
     if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
         user_id = message.author.id
@@ -140,6 +167,7 @@ async def retrieve_instagram_media(message):
             # Fetch media data concurrently
             for media_url in media_urls:
                 tasks.append(get_media_data(session, media_url))
+                time.sleep(3)
             media_data_results = await asyncio.gather(*tasks)
 
             media_files = []
@@ -178,7 +206,7 @@ async def retrieve_instagram_media(message):
 
 
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "jarellgalura"  # Replace with your Instagram username
+INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
 
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
