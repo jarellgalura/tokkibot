@@ -206,7 +206,7 @@ async def retrieve_instagram_media(message):
 
 
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
+INSTAGRAM_USERNAME = "hannidiscord"  # Replace with your Instagram username
 
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
