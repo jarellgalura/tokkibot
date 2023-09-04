@@ -5,6 +5,8 @@ import re
 import os
 from PIL import Image
 import io
+from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException
+import getpass
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -23,6 +25,8 @@ client = discord.Client(intents=intents)
 # Instantiate the TikTok class
 tiktok = TikTok()
 L = instaloader.Instaloader()
+INSTAGRAM_USERNAME = 'hannidiscord'
+INSTAGRAM_PASSWORD = 'jcdg120899'
 
 
 @client.event
@@ -74,6 +78,59 @@ async def on_message(message):
 
         user_last_link_time[user_id] = current_time
         await retrieve_instagram_media(message)
+
+INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
+INSTAGRAM_USERNAME = "hannidiscord"  # Replace with your Instagram username
+
+# Create an Instaloader context with the desired session file name
+L = instaloader.Instaloader(
+    filename_pattern="session-{username}", max_connection_attempts=1)
+
+
+async def login_instagram():
+
+    # Load or create a session
+    session_file_path = os.path.join(
+        INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
+    try:
+        L.load_session_from_file(
+            INSTAGRAM_USERNAME, filename=session_file_path)
+    except (FileNotFoundError, BadCredentialsException):
+        try:
+            L.context.log('Logging in with provided credentials.')
+            L.context.log("Session file does not exist yet - Logging in.")
+            L.context.log(
+                "If you have not logged in yet, you will be asked for your Instagram credentials.")
+            L.context.log(
+                "If you have chosen the 'Remember me' option while logging in, the session file will be created and you won't have to log in again next time.")
+            pass
+        except TwoFactorAuthRequiredException as e:
+            L.context.log('Two-factor authentication required.')
+
+            # Check the available 2FA methods
+            available_methods = e.available_methods
+
+            if '0' in available_methods:
+                # SMS is available as a 2FA method
+                phone_number = input('Enter your phone number for SMS 2FA: ')
+                L.two_factor_login_sms(phone_number)
+
+            elif '1' in available_methods:
+                # Email is available as a 2FA method
+                email = input('Enter your email for email 2FA: ')
+                L.two_factor_login_email(email)
+
+            elif '3' in available_methods:
+                # Authentication app (TOTP) is available as a 2FA method
+                otp_code = getpass.getpass(
+                    'Enter your authentication app OTP code: ')
+                L.two_factor_login_totp(otp_code)
+
+            try:
+                L.save_session_to_file()
+                L.context.log('Logged in after 2FA.')
+            except Exception as e:
+                L.context.log(f'Failed to log in after 2FA: {e}')
 
 
 async def convert_heic_to_jpg(heic_data):
@@ -182,4 +239,5 @@ def run_discord_bot():
 
 
 if __name__ == '__main__':
+    asyncio.run(login_instagram())
     run_discord_bot()
