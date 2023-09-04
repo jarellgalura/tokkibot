@@ -124,7 +124,7 @@ async def retrieve_instagram_media(message):
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0'}
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
