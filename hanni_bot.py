@@ -4,22 +4,19 @@ import instaloader
 import re
 from PIL import Image
 import io
-import os
-import tempfile
-import asyncio
-from datetime import datetime, timedelta
-from urllib.parse import urlparse, urljoin
-import aiohttp
-import time
-from kr_eng import *
 from mtranslate import translate
 
 # Import the TikTok script
 from tiktok_bot import TikTok
 
+# Import the Instagram script
+from hanniinstagram import *
+from kr_eng import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9QUlB.UfLDKULtmSlbrb33YT1mCJ7n1sEb8puQobX_jI'
+INSTAGRAM_USERNAME = 'praychandesu'
+INSTAGRAM_PASSWORD = 'jcdg120899'
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -28,11 +25,6 @@ client = discord.Client(intents=intents)
 # Instantiate the TikTok class
 tiktok = TikTok()
 L = instaloader.Instaloader()
-# Define cooldown duration (in seconds)
-COOLDOWN_DURATION = 5
-
-# Store last link message timestamp per user
-user_last_link_time = {}
 
 
 @client.event
@@ -71,30 +63,6 @@ async def on_message(message):
                         await message.edit(suppress=True)
             except Exception as e:
                 await message.channel.send(f"An error occurred: {e}")
-
-        # Avoid responding to the bot's own messages to prevent loops
-    if message.author == bot.user:
-        return
-
-    # Check if the bot was mentioned at the beginning of the message
-    if message.content.startswith(bot.user.mention):
-        # Extract the text after the mention
-        mentioned_text = message.content[len(bot.user.mention):].strip()
-
-        # Translate text using the 'mtranslate' library
-        translated_text = mtranslate(mentioned_text)
-
-        # Send the translation
-        await message.channel.send(f'{translated_text}')
-
-    # Process commands
-    await bot.process_commands(message)
-
-# Function to perform translation using the 'mtranslate' library
-
-    def mtranslate(text):
-        translated_text = translate(text, 'en', 'auto')
-        return translated_text
 
     if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
         user_id = message.author.id
@@ -156,18 +124,17 @@ async def retrieve_instagram_media(message):
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'
-    }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
+            # Rest of your media retrieval and sending code
             tasks = []
             media_data_results = []
 
             # Fetch media data concurrently
             for media_url in media_urls:
                 tasks.append(get_media_data(session, media_url))
-                time.sleep(3)
             media_data_results = await asyncio.gather(*tasks)
 
             media_files = []
@@ -205,34 +172,13 @@ async def retrieve_instagram_media(message):
             await message.delete()
 
 
-INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "hannidiscord"  # Replace with your Instagram username
-
-# Create an Instaloader context with the desired session file name
-L = instaloader.Instaloader(
-    filename_pattern="session-{username}", max_connection_attempts=1)
-
-
-async def get_media_data(session, url):
-    try:
-        async with session.get(url) as response:
-            response.raise_for_status()
-            return await response.read()
-    except aiohttp.ClientError as e:
-        print(f"Error during HTTP request: {e}")
-        return None
-
-
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
 
-    # Load or create a session
-    session_file_path = os.path.join(
-        INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
+    # Login to Instagram using instaloader
     try:
-        L.load_session_from_file(
-            INSTAGRAM_USERNAME, filename=session_file_path)
+        L.load_session_from_file(INSTAGRAM_USERNAME)
     except FileNotFoundError:
         L.context.log("Session file does not exist yet - Logging in.")
         L.context.log(
