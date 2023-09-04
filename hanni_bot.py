@@ -5,9 +5,10 @@ import re
 import os
 from PIL import Image
 import io
-from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException, HTTPException
+from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException
 import getpass
 import time
+import random
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -176,8 +177,27 @@ async def retrieve_instagram_media(message):
 
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
+    USER_AGENTS = [
+        # Desktop user agents (existing agents)
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36",
+
+        # Mobile user agents
+        "Mozilla/5.0 (Linux; Android 10; SM-G975U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 11; Pixel 4 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36",
+
+        # Chrome on desktop user agents
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
+    ]
+
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
+        # Randomly select a user agent
+        'User-Agent': random.choice(USER_AGENTS),
+    }
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
