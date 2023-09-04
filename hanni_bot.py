@@ -171,14 +171,24 @@ async def retrieve_instagram_media(message):
             # Delete the original Instagram link message
             await message.delete()
 
+INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
+INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
+
+# Create an Instaloader context with the desired session file name
+L = instaloader.Instaloader(
+    filename_pattern="session-{username}", max_connection_attempts=1)
+
 
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
 
-    # Login to Instagram using instaloader
+    # Load or create a session
+    session_file_path = os.path.join(
+        INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
     try:
-        L.load_session_from_file(INSTAGRAM_USERNAME)
+        L.load_session_from_file(
+            INSTAGRAM_USERNAME, filename=session_file_path)
     except FileNotFoundError:
         L.context.log("Session file does not exist yet - Logging in.")
         L.context.log(
