@@ -2,21 +2,19 @@ import asyncio
 import discord
 import instaloader
 import re
+import os
 from PIL import Image
 import io
-from mtranslate import translate
 
 # Import the TikTok script
 from tiktok_bot import TikTok
 
 # Import the Instagram script
 from hanniinstagram import *
-from kr_eng import *
+
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9QUlB.UfLDKULtmSlbrb33YT1mCJ7n1sEb8puQobX_jI'
-INSTAGRAM_USERNAME = 'praychandesu'
-INSTAGRAM_PASSWORD = 'jcdg120899'
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -124,7 +122,7 @@ async def retrieve_instagram_media(message):
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0'}
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
@@ -153,8 +151,8 @@ async def retrieve_instagram_media(message):
                 with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
                     tmp_file.write(media_data)
                     tmp_file.seek(0)
-                    temp_path = os.path.join(tempfile.gettempdir(),
-                                             f'{index:02d}{os.path.splitext(urlparse(media_urls[index - 1]).path)[1]}')
+                    temp_path = os.path.join(tempfile.gettempdir(
+                    ), f'{index:02d}{os.path.splitext(urlparse(media_urls[index - 1]).path)[1]}')
                     with open(temp_path, 'wb') as f:
                         f.write(tmp_file.read())
                     media_files.append(discord.File(temp_path))
@@ -171,34 +169,10 @@ async def retrieve_instagram_media(message):
             # Delete the original Instagram link message
             await message.delete()
 
-INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
-
-# Create an Instaloader context with the desired session file name
-L = instaloader.Instaloader(
-    filename_pattern="session-{username}", max_connection_attempts=1)
-
 
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')
-
-    # Load or create a session
-    session_file_path = os.path.join(
-        INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
-    try:
-        L.load_session_from_file(
-            INSTAGRAM_USERNAME, filename=session_file_path)
-    except FileNotFoundError:
-        L.context.log("Session file does not exist yet - Logging in.")
-        L.context.log(
-            "If you have not logged in yet, you will be asked for your Instagram credentials.")
-        L.context.log(
-            "If you have chosen the 'Remember me' option while logging in, the session file will be created and you won't have to log in again next time.")
-        pass
-    except Exception as e:
-        L.context.log(f"Error while loading session: {e}")
-        pass
 
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
 
