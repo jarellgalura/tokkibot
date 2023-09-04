@@ -19,7 +19,7 @@ from tiktok_bot import TikTok
 
 
 # Your bot's token
-TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G1r_lp.BxIzRaqOJQ9aRHnEsXd3LRnpkPFHTHh8cwysWw'
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9QUlB.UfLDKULtmSlbrb33YT1mCJ7n1sEb8puQobX_jI'
 
 intents = discord.Intents.default()
 intents.message_content = True
