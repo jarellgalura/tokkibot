@@ -5,8 +5,9 @@ import re
 import os
 from PIL import Image
 import io
-from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException
+from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException, HTTPException
 import getpass
+import time
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -24,8 +25,12 @@ client = discord.Client(intents=intents)
 
 # Instantiate the TikTok class
 tiktok = TikTok()
-INSTAGRAM_USERNAME = 'hannidiscord'
-INSTAGRAM_PASSWORD = 'jcdg120899'
+INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
+INSTAGRAM_USERNAME = "ja.dmp_"  # Replace with your Instagram username
+
+# Create an Instaloader context with the desired session file name
+L = instaloader.Instaloader(
+    filename_pattern="session-{username}", max_connection_attempts=1)
 
 
 @client.event
@@ -78,13 +83,6 @@ async def on_message(message):
         user_last_link_time[user_id] = current_time
         await retrieve_instagram_media(message)
 
-INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "hannidiscord"  # Replace with your Instagram username
-
-# Create an Instaloader context with the desired session file name
-L = instaloader.Instaloader(
-    filename_pattern="session-{username}", max_connection_attempts=1, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36')
-
 
 async def login_instagram():
 
@@ -128,8 +126,9 @@ async def login_instagram():
             try:
                 L.save_session_to_file()
                 L.context.log('Logged in after 2FA.')
-            except Exception as e:
-                L.context.log(f'Failed to log in after 2FA: {e}')
+            except HTTPException as e:
+                L.context.log(f"HTTP Exception: {e}")
+                time.sleep(60)
 
 
 async def convert_heic_to_jpg(heic_data):
@@ -177,7 +176,9 @@ async def retrieve_instagram_media(message):
 
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
-    async with aiohttp.ClientSession() as session:
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
+    async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
             # Rest of your media retrieval and sending code
