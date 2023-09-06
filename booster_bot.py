@@ -217,7 +217,7 @@ async def claim(ctx):
                     # Find the position of the booster identifier role
                     booster_identifier_position = booster_role.position
 
-                    # Calculate the position for the custom role
+                    # Calculate the position for the custom role (just below booster identifier)
                     custom_role_position = max(booster_identifier_position, 1)
 
                     # Edit the custom role's position
