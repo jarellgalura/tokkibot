@@ -11,14 +11,52 @@ bot = commands.Bot(command_prefix='hn ', intents=intents)
 # MySQL Database Setup
 
 
+def create_guild_table(guild_id):
+    try:
+        db_connection = mysql.connector.connect(
+            host="hannibot.cwhomitcgl2p.ap-southeast-2.rds.amazonaws.com",
+            user="admin",
+            password="jcdg120899",
+            database="hannibot",
+            port="3306",
+        )
+        cursor = db_connection.cursor()
+
+        # Check if the table already exists
+        cursor.execute(f"SHOW TABLES LIKE 'guild_{guild_id}'")
+        table_exists = cursor.fetchone()
+
+        if not table_exists:
+            # Create the table for the guild
+            cursor.execute(f'''
+                CREATE TABLE IF NOT EXISTS guild_{guild_id} (
+                    user_id BIGINT,
+                    guild_id BIGINT,
+                    role_id BIGINT,
+                    ban_words TEXT,
+                    booster_role_id BIGINT,
+                    greeting_message TEXT,
+                    greeting_channel_id BIGINT,
+                    log_channel_id BIGINT
+                )
+            ''')
+            db_connection.commit()  # Commit the changes
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+    finally:
+        if db_connection:
+            db_connection.close()
+
+
 def execute_query(query, values=None, fetchone=False, commit=False):
     db_connection = None
     try:
         db_connection = mysql.connector.connect(
-            host="containers-us-west-80.railway.app",
-            user="root",
-            password="wdF70jjesWe9qSdJEVeM",
-            database="railway"
+            host="hannibot.cwhomitcgl2p.ap-southeast-2.rds.amazonaws.com",
+            user="admin",
+            password="jcdg120899",
+            database="hannibot",
+            port="3306",
         )
         cursor = db_connection.cursor()
 
@@ -41,7 +79,6 @@ def execute_query(query, values=None, fetchone=False, commit=False):
 
 
 # Helper function for executing SQL queries
-
 
 greeting_message = "Thank you for boosting! We appreciate your support."
 greeting_channel = None  # Store the greeting channel
@@ -283,34 +320,51 @@ async def role(ctx, action, *, args=""):
             if ban_words_result and ban_words_result[0]:
                 banned_words_str = ban_words_result[0]
 
-                if banned_words_str:
-                    ban_words = banned_words_str.split(',')
-                    for word in ban_words:
-                        # Use re.search to check if the banned word pattern is in the new role name
-                        if re.search(fr"{word}", new_name, re.IGNORECASE):
-                            embed = discord.Embed(
-                                title="Role Name Update Failed",
-                                description=f"The role name contains a banned word or pattern: {word}.",
-                                color=discord.Color.red()
-                            )
-                            user_avatar_url = ctx.author.avatar.url
-                            embed.set_thumbnail(url=user_avatar_url)
-                            bot_avatar_url = bot.user.avatar.url
-                            embed.set_footer(text="HanniBot - hn help for commands",
-                                             icon_url=bot_avatar_url)
-                            await ctx.send(embed=embed)
+            if banned_words_str:
+                ban_words = banned_words_str.split(',')
+                for word in ban_words:
+                    # Use re.search to check if the banned word pattern is in the new role name
+                    if re.search(fr"{word}", new_name, re.IGNORECASE):
+                        embed = discord.Embed(
+                            title="Role Name Change Attempt",
+                            description=f"User {ctx.author.mention} attempted to change their role name to a name containing a banned word.",
+                            color=discord.Color.red()
+                        )
+                        embed.add_field(
+                            name="User", value=ctx.author.mention, inline=False)
+                        embed.add_field(name="Attempted Role Name",
+                                        value=new_name, inline=False)
+                        embed.add_field(name="Banned Word",
+                                        value=word, inline=False)
 
-                            return
+                        # Add the profile of the user who attempted the change
+                        embed.set_author(name=ctx.author.name,
+                                         icon_url=ctx.author.avatar.url)
+
+                        log_channel_id_result = execute_query(
+                            f"SELECT log_channel_id FROM {table_name} WHERE guild_id = %s", (ctx.guild.id,), fetchone=True)
+                        log_channel = bot.get_channel(
+                            log_channel_id_result[0]) if log_channel_id_result else None
+                        if log_channel:
+                            await log_channel.send(embed=embed)
+
+                    error_embed = discord.Embed(
+                        title="Role Name Update Failed",
+                        description=f"The role name contains a banned word: `{word}`.",
+                        color=discord.Color.red()
+                    )
+                    user_avatar_url = ctx.author.avatar.url
+                    error_embed.set_thumbnail(url=user_avatar_url)
+                    bot_avatar_url = bot.user.avatar.url
+                    error_embed.set_footer(
+                        text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
+                    await ctx.send(embed=error_embed)
+                    return
 
             custom_role = discord.utils.get(ctx.guild.roles, name=new_name)
 
             if custom_role:
-                embed = discord.Embed(
-                    title="Role Name Update Failed",
-                    description="A role with that name already exists.",
-                    color=discord.Color.red()
-                )
-                await ctx.send(embed=embed)
+                await send_error_message(ctx, "A role with that name already exists.")
             else:
                 try:
                     await ctx.author.top_role.edit(name=new_name)
@@ -327,12 +381,7 @@ async def role(ctx, action, *, args=""):
                         text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
                     await ctx.send(embed=embed)
                 except discord.Forbidden:
-                    embed = discord.Embed(
-                        title="Role Name Update Failed",
-                        description="You don't have permission to edit this role.",
-                        color=discord.Color.red()
-                    )
-                    await ctx.send(embed=embed)
+                    await send_error_message(ctx, "You don't have permission to edit this role.")
 
         elif action == "color":
             role_id = None
@@ -394,196 +443,215 @@ async def role(ctx, action, *, args=""):
 
 @bot.command()
 async def addbanword(ctx, regex: bool = False, *, word):
-    if ctx.author.guild_permissions.manage_roles:
-        # Fetch existing ban words for the guild
-        ban_words_result = execute_query(
-            f"SELECT ban_words FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,))
+    async with ctx.typing():
+        if ctx.author.guild_permissions.manage_roles:
+            # Fetch existing ban words for the guild
+            ban_words_result = execute_query(
+                f"SELECT ban_words FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,))
 
-        if ban_words_result:
-            existing_ban_words = ban_words_result[0][0].split(
-                ',') if ban_words_result[0][0] else []
+            if ban_words_result:
+                existing_ban_words = ban_words_result[0][0].split(
+                    ',') if ban_words_result[0][0] else []
+            else:
+                existing_ban_words = []
+
+            # Check if the word is already in the ban words list
+            if word.lower() in existing_ban_words:
+                embed = discord.Embed(
+                    title="Banned Word",
+                    description="This word is already in the ban words list.",
+                    color=discord.Color.red()
+                )
+            else:
+                if regex:
+                    try:
+                        # Attempt to compile the word as a regex pattern
+                        re.compile(word)
+                        existing_ban_words.append(word)
+                    except re.error:
+                        # Invalid regex pattern
+                        embed = discord.Embed(
+                            title="Invalid Regular Expression",
+                            description="The provided regular expression pattern is invalid.",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed)
+                        return
+                else:
+                    # Append the new ban word to the existing list as a plain word
+                    existing_ban_words.append(word.lower())
+
+                # Join the ban words into a single string
+                updated_ban_words_str = ','.join(existing_ban_words)
+
+                execute_query(
+                    f"UPDATE guild_{ctx.guild.id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, ctx.guild.id), commit=True)
+
+                embed = discord.Embed(
+                    title="Banned Words",
+                    description=f"{'Regex ' if regex else ''}**{word}** has been added to the guild's ban words list.",
+                    color=discord.Color.pink()
+                )
+
+            user_avatar_url = ctx.author.avatar.url
+            embed.set_thumbnail(url=user_avatar_url)
+            bot_avatar_url = bot.user.avatar.url
+            embed.set_footer(text="HanniBot - hn help for commands",
+                             icon_url=bot_avatar_url)
+            await ctx.send(embed=embed)
         else:
-            existing_ban_words = []
-
-        # Check if the word is already in the ban words list
-        if word.lower() in existing_ban_words:
+            # Inform the user that they don't have the required permission
             embed = discord.Embed(
-                title="Banned Word",
-                description="This word is already in the ban words list.",
+                title="Add Banned Word",
+                description="You don't have permission to use this command. You need the 'Manage Roles' permission.",
                 color=discord.Color.red()
             )
-        else:
-            if regex:
-                try:
-                    # Attempt to compile the word as a regex pattern
-                    re.compile(word)
-                    existing_ban_words.append(word)
-                except re.error:
-                    # Invalid regex pattern
-                    embed = discord.Embed(
-                        title="Invalid Regular Expression",
-                        description="The provided regular expression pattern is invalid.",
-                        color=discord.Color.red()
-                    )
-                    await ctx.send(embed=embed)
-                    return
-            else:
-                # Append the new ban word to the existing list as a plain word
-                existing_ban_words.append(word.lower())
-
-            # Join the ban words into a single string
-            updated_ban_words_str = ','.join(existing_ban_words)
-
-            execute_query(
-                f"UPDATE guild_{ctx.guild.id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, ctx.guild.id), commit=True)
-
-            embed = discord.Embed(
-                title="Banned Words",
-                description=f"{'Regex ' if regex else ''}**{word}** has been added to the guild's ban words list.",
-                color=discord.Color.pink()
-            )
-
-        user_avatar_url = ctx.author.avatar.url
-        embed.set_thumbnail(url=user_avatar_url)
-        bot_avatar_url = bot.user.avatar.url
-        embed.set_footer(text="HanniBot - hn help for commands",
-                         icon_url=bot_avatar_url)
-        await ctx.send(embed=embed)
-    else:
-        # Inform the user that they don't have the required permission
-        embed = discord.Embed(
-            title="Add Banned Word",
-            description="You don't have permission to use this command. You need the 'Manage Roles' permission.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
+            await ctx.send(embed=embed)
 
 
 @bot.command()
 async def listbanwords(ctx):
-    if ctx.author.guild_permissions.manage_roles:
-        guild_id = ctx.guild.id
-        ban_words_result = execute_query(
-            f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = %s", (ctx.guild.id,))
+    async with ctx.typing():
+        if ctx.author.guild_permissions.manage_roles:
+            guild_id = ctx.guild.id
+            ban_words_result = execute_query(
+                f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = %s", (ctx.guild.id,))
 
-        if not ban_words_result or not ban_words_result[0]:
+            if not ban_words_result or not ban_words_result[0]:
+                embed = discord.Embed(
+                    title="Banned Words List",
+                    description="No banned words are currently set for this guild.",
+                    color=discord.Color.blue()
+                )
+                user_avatar_url = ctx.author.avatar.url
+                embed.set_thumbnail(url=user_avatar_url)
+                bot_avatar_url = bot.user.avatar.url
+                embed.set_footer(
+                    text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
+                await ctx.send(embed=embed)
+                return
+
+            ban_words = ban_words_result[0][0].split(',')
+            total_ban_words = len(ban_words)
+
+            # Split and enumerate the banned words
+            formatted_ban_words = "\n".join(
+                [f"{i+1}. {word}" for i, word in enumerate(ban_words)])
+
+            # Split the formatted banned words into chunks of 10 items
+            items_per_page = 10
+            formatted_ban_words_list = formatted_ban_words.split('\n')
+            formatted_ban_words_chunks = [
+                formatted_ban_words_list[i:i + items_per_page] for i in range(0, len(formatted_ban_words_list), items_per_page)]
+
+            embeds = []
+            for i, chunk in enumerate(formatted_ban_words_chunks):
+                embed = discord.Embed(
+                    title=f"Banned Words List - (Total: {total_ban_words})",
+                    description='\n'.join(chunk),
+                    color=discord.Color.pink()
+                )
+                embed.set_thumbnail(url=bot.user.avatar.url)
+                embed.set_footer(
+                    text=f"Page {i+1}/{len(formatted_ban_words_chunks)}")
+                embeds.append(embed)
+
+            current_page = 0
+            msg = await ctx.send(embed=embeds[current_page])
+            await msg.add_reaction("⬅️")
+            await msg.add_reaction("➡️")
+
+            def check(reaction, user):
+                return user == ctx.author and reaction.message == msg and str(reaction.emoji) in ["⬅️", "➡️"]
+
+            while True:
+                try:
+                    reaction, user = await bot.wait_for("reaction_add", timeout=60, check=check)
+
+                    if str(reaction.emoji) == "➡️" and current_page < len(embeds) - 1:
+                        current_page += 1
+                    elif str(reaction.emoji) == "⬅️" and current_page > 0:
+                        current_page -= 1
+
+                    await msg.edit(embed=embeds[current_page])
+                    await msg.remove_reaction(reaction, user)
+                except TimeoutError:
+                    break
+
+            await msg.clear_reactions()
+        else:
+            # Inform the user that they don't have the required permission
             embed = discord.Embed(
-                title="Banned Words List",
-                description="No banned words are currently set for this guild.",
-                color=discord.Color.blue()
+                title="List Banned Words",
+                description="You don't have permission to use this command. You need the 'Manage Roles' permission.",
+                color=discord.Color.red()
             )
-            user_avatar_url = ctx.author.avatar.url
-            embed.set_thumbnail(url=user_avatar_url)
-            bot_avatar_url = bot.user.avatar.url
-            embed.set_footer(
-                text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
             await ctx.send(embed=embed)
-            return
-
-        ban_words = ban_words_result[0][0].split(',')
-        total_ban_words = len(ban_words)
-
-        # Split and enumerate the banned words
-        formatted_ban_words = "\n".join(
-            [f"{i+1}. {word}" for i, word in enumerate(ban_words)])
-
-        # Split the formatted banned words into chunks of 10 items
-        items_per_page = 10
-        formatted_ban_words_list = formatted_ban_words.split('\n')
-        formatted_ban_words_chunks = [
-            formatted_ban_words_list[i:i + items_per_page] for i in range(0, len(formatted_ban_words_list), items_per_page)]
-
-        embeds = []
-        for i, chunk in enumerate(formatted_ban_words_chunks):
-            embed = discord.Embed(
-                title=f"Banned Words List - (Total: {total_ban_words})",
-                description='\n'.join(chunk),
-                color=discord.Color.pink()
-            )
-            embed.set_thumbnail(url=bot.user.avatar.url)
-            embed.set_footer(
-                text=f"Page {i+1}/{len(formatted_ban_words_chunks)}")
-            embeds.append(embed)
-
-        current_page = 0
-        msg = await ctx.send(embed=embeds[current_page])
-        await msg.add_reaction("⬅️")
-        await msg.add_reaction("➡️")
-
-        def check(reaction, user):
-            return user == ctx.author and reaction.message == msg and str(reaction.emoji) in ["⬅️", "➡️"]
-
-        while True:
-            try:
-                reaction, user = await bot.wait_for("reaction_add", timeout=60, check=check)
-
-                if str(reaction.emoji) == "➡️" and current_page < len(embeds) - 1:
-                    current_page += 1
-                elif str(reaction.emoji) == "⬅️" and current_page > 0:
-                    current_page -= 1
-
-                await msg.edit(embed=embeds[current_page])
-                await msg.remove_reaction(reaction, user)
-            except TimeoutError:
-                break
-
-        await msg.clear_reactions()
-    else:
-        # Inform the user that they don't have the required permission
-        embed = discord.Embed(
-            title="List Banned Words",
-            description="You don't have permission to use this command. You need the 'Manage Roles' permission.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
 
 
 @bot.command()
 async def removebanword(ctx, *, word):
-    if ctx.author.guild_permissions.manage_roles:
-        guild_id = ctx.guild.id
-        ban_words_result = execute_query(
-            f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = %s", (guild_id,))
+    async with ctx.typing():
+        if ctx.author.guild_permissions.manage_roles:
+            guild_id = ctx.guild.id
+            ban_words_result = execute_query(
+                f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = %s", (guild_id,))
 
-        embed = discord.Embed(color=discord.Color.red())
+            embed = discord.Embed(color=discord.Color.red())
 
-        if ban_words_result and ban_words_result[0]:
-            ban_words = ban_words_result[0][0].split(',')
-            updated_ban_words = [
-                w for w in ban_words if w.strip().lower() != word.lower()]
+            if ban_words_result and ban_words_result[0]:
+                ban_words = ban_words_result[0][0].split(',')
 
-            if len(updated_ban_words) == len(ban_words):
-                embed.title = "Ban Word Removal Failed"
-                embed.description = f"{word} is not in the ban words list."
+                # Check if the input is a number
+                if word.isdigit():
+                    word_index = int(word) - 1  # Convert to 0-based index
+                    if 0 <= word_index < len(ban_words):
+                        removed_word = ban_words.pop(word_index)
+
+                        updated_ban_words_str = ','.join(ban_words)
+                        execute_query(
+                            f"UPDATE guild_{guild_id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, guild_id), commit=True)
+
+                        embed.title = "Ban Word Removed"
+                        embed.description = f"**{removed_word}** has been removed from the ban words list."
+                        embed.color = discord.Color.pink()
+                    else:
+                        embed.title = "Invalid Index"
+                        embed.description = "The specified index is out of range."
+                elif word.lower() in [w.strip().lower() for w in ban_words]:
+                    updated_ban_words = [
+                        w for w in ban_words if w.strip().lower() != word.lower()]
+
+                    updated_ban_words_str = ','.join(updated_ban_words)
+                    execute_query(
+                        f"UPDATE guild_{guild_id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, guild_id), commit=True)
+
+                    embed.title = "Ban Word Removed"
+                    embed.description = f"**{word}** has been removed from the ban words list."
+                    embed.color = discord.Color.pink()
+                else:
+                    embed.title = "Ban Word Removal Failed"
+                    embed.description = f"{word} is not in the ban words list."
             else:
-                updated_ban_words_str = ','.join(updated_ban_words)
+                embed.title = "No Ban Words Found"
+                embed.description = "No ban words found for this guild."
+                embed.color = discord.Color.blue()
 
-                execute_query(
-                    f"UPDATE guild_{guild_id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, guild_id), commit=True)
+            user_avatar_url = ctx.author.avatar.url
+            embed.set_thumbnail(url=user_avatar_url)
+            bot_avatar_url = bot.user.avatar.url
+            embed.set_footer(text="HanniBot - hn help for commands",
+                             icon_url=bot_avatar_url)
 
-                embed.title = "Ban Word Removed"
-                embed.description = f"**{word}** has been removed from the ban words list."
-                embed.color = discord.Color.pink()
+            await ctx.send(embed=embed)
         else:
-            embed.title = "No Ban Words Found"
-            embed.description = "No ban words found for this guild."
-            embed.color = discord.Color.blue()
-
-        user_avatar_url = ctx.author.avatar.url
-        embed.set_thumbnail(url=user_avatar_url)
-        bot_avatar_url = bot.user.avatar.url
-        embed.set_footer(text="HanniBot - hn help for commands",
-                         icon_url=bot_avatar_url)
-
-        await ctx.send(embed=embed)
-    else:
-        # Inform the user that they don't have the required permission
-        embed = discord.Embed(
-            title="Remove Ban Word",
-            description="You don't have permission to use this command. You need the 'Manage Roles' permission.",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
+            # Inform the user that they don't have the required permission
+            embed = discord.Embed(
+                title="Remove Ban Word",
+                description="You don't have permission to use this command. You need the 'Manage Roles' permission.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
 
 
 @bot.command()
@@ -761,6 +829,19 @@ async def on_guild_role_update(before, after):
                 if word.lower() in after.name.lower():
                     await after.edit(name="Filtered_Name")
                     break  # Stop checking if a banned word is found
+
+
+@bot.event
+async def on_ready():
+    # When the bot is ready, create tables for all guilds it is in
+    for guild in bot.guilds:
+        create_guild_table(guild.id)
+
+
+@bot.event
+async def on_guild_join(guild):
+    # When the bot joins a new guild, create a table for that guild
+    create_guild_table(guild.id)
 
 bot.remove_command("help")
 
