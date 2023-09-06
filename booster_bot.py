@@ -1,14 +1,47 @@
+import re  # Import the 're' module for regular expressions
 import discord
 from discord.ext import commands
-import sqlite3
+import mysql.connector
+
 intents = discord.Intents.all()
 intents.members = True
 
-bot = commands.Bot(command_prefix='$', intents=intents)
+bot = commands.Bot(command_prefix='hn ', intents=intents)
 
-# SQLite Database Setup
-conn = sqlite3.connect('bot_database.db')
-cursor = conn.cursor()
+# MySQL Database Setup
+
+
+def execute_query(query, values=None, fetchone=False, commit=False):
+    db_connection = None
+    try:
+        db_connection = mysql.connector.connect(
+            host="containers-us-west-48.railway.app",
+            user="root",
+            password="K7zECJ9XZBEeWKxMdblM",
+            database="railway"
+        )
+        cursor = db_connection.cursor()
+
+        cursor.execute(query, values)
+
+        if fetchone:
+            result = cursor.fetchone()
+        else:
+            result = cursor.fetchall()
+
+        if commit:
+            db_connection.commit()  # Commit the changes
+
+        return result
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+    finally:
+        if db_connection:
+            db_connection.close()
+
+
+# Helper function for executing SQL queries
+
 
 greeting_message = "Thank you for boosting! We appreciate your support."
 greeting_channel = None  # Store the greeting channel
@@ -19,17 +52,16 @@ greeting_channel = None  # Store the greeting channel
 async def greet(ctx):
     """
     Manage greeting settings.
-    Usage: $greeting <channel|message>
+    Usage: hn greeting <channel|message>
     """
-    await ctx.send("Invalid subcommand. Use `$help greeting` for usage information.")
+    await ctx.send("Invalid subcommand. Use `hn help greeting` for usage information.")
 
 
 @greet.command(name="message")
 async def set_greeting_message(ctx, *, message):
     if ctx.author.guild_permissions.manage_roles:
-        cursor.execute(f"UPDATE guild_{ctx.guild.id} SET greeting_message = ? WHERE guild_id = ?",
-                       (message, ctx.guild.id))
-        conn.commit()
+        execute_query(f"UPDATE guild_{ctx.guild.id} SET greeting_message = %s WHERE guild_id = %s",
+                      (message, ctx.guild.id), commit=True)
         await ctx.send("Greeting message has been updated.")
     else:
         # Inform the user that they don't have the required permission
@@ -44,9 +76,8 @@ async def set_greeting_message(ctx, *, message):
 @greet.command(name="channel")
 async def set_greeting_channel(ctx, channel: discord.TextChannel):
     if ctx.author.guild_permissions.manage_roles:
-        cursor.execute(f"UPDATE guild_{ctx.guild.id} SET greeting_channel_id = ? WHERE guild_id = ?",
-                       (channel.id, ctx.guild.id))
-        conn.commit()
+        execute_query(f"UPDATE guild_{ctx.guild.id} SET greeting_channel_id = %s WHERE guild_id = %s",
+                      (channel.id, ctx.guild.id), commit=True)
         await ctx.send(f"Greeting channel has been set to {channel.mention}.")
     else:
         # Inform the user that they don't have the required permission
@@ -62,28 +93,40 @@ async def set_greeting_channel(ctx, channel: discord.TextChannel):
 async def greet_test(ctx):
     """
     Test the greeting message.
-    Usage: $greettest
+    Usage: hn greet test
     """
     global greeting_message
 
-    booster_role_id = cursor.execute(
-        f"SELECT booster_role_id FROM guild_{ctx.guild.id} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
+    booster_role_id_result = execute_query(
+        f"SELECT booster_role_id FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,))
 
-    if booster_role_id is not None and booster_role_id[0] is not None:
+    if booster_role_id_result and booster_role_id_result[0]:
+        booster_role_id = booster_role_id_result[0][0]
         booster_role = discord.utils.get(
-            ctx.guild.roles, id=booster_role_id[0])
+            ctx.guild.roles, id=booster_role_id)
 
         if booster_role in ctx.author.roles:
-            greeting_channel_id = cursor.execute(
-                f"SELECT greeting_channel_id FROM guild_{ctx.guild.id} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
-            greeting_channel = ctx.guild.get_channel(
-                greeting_channel_id[0]) if greeting_channel_id and greeting_channel_id[0] else None
+            greeting_channel_id_result = execute_query(
+                f"SELECT greeting_channel_id FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,))
 
-            if greeting_channel:
-                greeting_message_plain = greeting_message.replace(
-                    "{user}", ctx.author.mention)
-                await greeting_channel.send(greeting_message_plain)
-                await ctx.send("Greeting message sent for testing.")
+            if greeting_channel_id_result and greeting_channel_id_result[0]:
+                greeting_channel_id = greeting_channel_id_result[0][0]
+                greeting_channel = ctx.guild.get_channel(greeting_channel_id)
+
+                if greeting_channel:
+                    # Check if a custom greeting message is set
+                    greeting_message_result = execute_query(
+                        f"SELECT greeting_message FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,))
+
+                    if greeting_message_result and greeting_message_result[0]:
+                        greeting_message = greeting_message_result[0][0]
+
+                    greeting_message_plain = greeting_message.replace(
+                        "{user}", ctx.author.mention)
+                    await greeting_channel.send(greeting_message_plain)
+                    await ctx.send("Greeting message sent for testing.")
+                else:
+                    await ctx.send("Greeting channel not set.")
             else:
                 await ctx.send("Greeting channel not set.")
         else:
@@ -98,7 +141,7 @@ async def send_error_message(ctx, message):
     user_avatar_url = ctx.author.avatar.url
     embed.set_thumbnail(url=user_avatar_url)
     bot_avatar_url = bot.user.avatar.url
-    embed.set_footer(text="HanniBot - $help for commands",
+    embed.set_footer(text="HanniBot - hn help for commands",
                      icon_url=bot_avatar_url)
     await ctx.send(embed=embed)
 
@@ -109,8 +152,8 @@ async def claim(ctx):
         print(f"Guild ID: {ctx.guild.id}")  # Debug print
 
     # Fetch the booster identifier role ID from the database
-    booster_identifier_role_id = cursor.execute(
-        f"SELECT booster_role_id FROM guild_{ctx.guild.id} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
+    booster_identifier_role_id = execute_query(
+        f"SELECT booster_role_id FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,), fetchone=True)
 
     # Debug print
     print(f"Booster Identifier Role ID: {booster_identifier_role_id}")
@@ -125,8 +168,8 @@ async def claim(ctx):
         if booster_role:
             print("Booster identifier role found")  # Debug print
             if booster_role in ctx.author.roles:
-                custom_role_id = cursor.execute(
-                    f"SELECT role_id FROM guild_{ctx.guild.id} WHERE guild_id = ? AND user_id = ?", (ctx.guild.id, ctx.author.id)).fetchone()
+                custom_role_id = execute_query(
+                    f"SELECT role_id FROM guild_{ctx.guild.id} WHERE guild_id = %s AND user_id = %s", (ctx.guild.id, ctx.author.id), fetchone=True)
 
                 print(f"Custom Role ID: {custom_role_id}")
 
@@ -143,17 +186,48 @@ async def claim(ctx):
                     # Edit the custom role's position
                     await custom_role.edit(position=custom_role_position)
 
+                    # Check for banned words in the role name
+                    ban_words_result = execute_query(
+                        f"SELECT ban_words FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,), fetchone=True)
+
+                    if ban_words_result and ban_words_result[0]:
+                        ban_words = ban_words_result[0].split(',')
+                        for word in ban_words:
+                            if word.lower() in custom_role.name.lower():
+                                await custom_role.delete()
+                                embed = discord.Embed(
+                                    title="Custom Role Claim Failed",
+                                    description=f"The role name contains a banned word or pattern: {word}.",
+                                    color=discord.Color.red()
+                                )
+                                user_avatar_url = ctx.author.avatar.url
+                                embed.set_thumbnail(url=user_avatar_url)
+                                bot_avatar_url = bot.user.avatar.url
+                                embed.set_footer(text="HanniBot - hn help for commands",
+                                                 icon_url=bot_avatar_url)
+                                await ctx.send(embed=embed)
+
+                                # Log the attempt to change role name to a banned word or pattern
+                                log_message = f"User {ctx.author.mention} attempted to change their role name to **{custom_role.name}**, which contains a banned word or pattern: **{word}**"
+                                log_channel_id_result = execute_query(
+                                    f"SELECT log_channel_id FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,), fetchone=True)
+                                log_channel = bot.get_channel(
+                                    log_channel_id_result[0]) if log_channel_id_result else None
+                                if log_channel:
+                                    await log_channel.send(log_message)
+
+                                return
+
                     # Assign the role to the user
                     await ctx.author.add_roles(custom_role)
 
                     # Insert the new row into the database for the user's custom role
-                    cursor.execute(f"INSERT INTO guild_{ctx.guild.id} (user_id, role_id, guild_id) VALUES (?, ?, ?)",
-                                   (ctx.author.id, custom_role.id, ctx.guild.id))
-                    conn.commit()
+                    execute_query(f"INSERT INTO guild_{ctx.guild.id} (user_id, role_id, guild_id) VALUES (%s, %s, %s)",
+                                  (ctx.author.id, custom_role.id, ctx.guild.id), commit=True)
 
                     embed = discord.Embed(
                         title="Custom Role Claimed",
-                        description=f"You've been granted a custom role: {custom_role.mention}\n\n **Edit your role:**\n **Name:** $role name NewName\n **Color:** $role color #FFFFFF",
+                        description=f"You've been granted a custom role: {custom_role.mention}\n\n **Edit your role:**\n **Name:** `hn role name NewName`\n **Color:** `hn role color #FFFFFF`\n **Icon:** `Request to booster channel.`",
                         color=discord.Color.pink()
                     )
                 else:
@@ -185,8 +259,8 @@ async def claim(ctx):
     user_avatar_url = ctx.author.avatar.url
     embed.set_thumbnail(url=user_avatar_url)
     bot_avatar_url = bot.user.avatar.url
-    embed.set_footer(text="HanniBot - $help for commands",
-                     icon_url=bot_avatar_url)
+    embed.set_footer(
+        text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
 
     # Send the embed as the message
     await ctx.send(embed=embed)
@@ -202,155 +276,134 @@ async def role(ctx, action, *, args=""):
             # Choose the appropriate table name based on guild ID
             table_name = f"guild_{ctx.guild.id}"
 
-            # Fetch banned words and role IDs from the database
-            role_ban_data = cursor.execute(
-                f"SELECT role_id, ban_words FROM {table_name}").fetchall()
+            # Fetch banned words from the database
+            ban_words_result = execute_query(
+                f"SELECT ban_words FROM {table_name} WHERE guild_id = %s", (ctx.guild.id,), fetchone=True)
 
-            for role_id, banned_words_str in role_ban_data:
-                custom_role = discord.utils.get(ctx.guild.roles, id=role_id)
+            if ban_words_result and ban_words_result[0]:
+                banned_words_str = ban_words_result[0]
 
-                if custom_role:
-                    if banned_words_str:
-                        ban_words = banned_words_str.split(',')
-                        for word in ban_words:
-                            if word.lower() in new_name.lower():
-                                embed = discord.Embed(
-                                    title="Role Name Update Failed",
-                                    description=f"The role name contains a banned word: {word}.",
-                                    color=discord.Color.red()
-                                )
-                                user_avatar_url = ctx.author.avatar.url
-                                embed.set_thumbnail(url=user_avatar_url)
-                                bot_avatar_url = bot.user.avatar.url
-                                embed.set_footer(text="HanniBot - $help for commands",
-                                                 icon_url=bot_avatar_url)
-                                await ctx.send(embed=embed)
+                if banned_words_str:
+                    ban_words = banned_words_str.split(',')
+                    for word in ban_words:
+                        # Use re.search to check if the banned word pattern is in the new role name
+                        if re.search(fr"{word}", new_name, re.IGNORECASE):
+                            embed = discord.Embed(
+                                title="Role Name Update Failed",
+                                description=f"The role name contains a banned word or pattern: {word}.",
+                                color=discord.Color.red()
+                            )
+                            user_avatar_url = ctx.author.avatar.url
+                            embed.set_thumbnail(url=user_avatar_url)
+                            bot_avatar_url = bot.user.avatar.url
+                            embed.set_footer(text="HanniBot - hn help for commands",
+                                             icon_url=bot_avatar_url)
+                            await ctx.send(embed=embed)
 
-                                # Log the attempt to change role name to a banned word
-                                log_message = f"User {ctx.author.mention} attempted to change their role name to **{new_name}**, which contains a banned word: **{word}**"
-                                log_channel_id = cursor.execute(
-                                    f"SELECT log_channel_id FROM {table_name} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
-                                log_channel = bot.get_channel(
-                                    log_channel_id[0])
-                                if log_channel:
-                                    await log_channel.send(log_message)
+                            return
 
-                                return
+            custom_role = discord.utils.get(ctx.guild.roles, name=new_name)
 
-                    # If no banned words were found, proceed with the role name update
-                    await custom_role.edit(name=new_name)
+            if custom_role:
+                embed = discord.Embed(
+                    title="Role Name Update Failed",
+                    description="A role with that name already exists.",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=embed)
+            else:
+                try:
+                    await ctx.author.top_role.edit(name=new_name)
 
-            # Role name updated successfully
-            embed = discord.Embed(
-                title="Role Name Updated",
-                description=f"The role name has been updated successfully.",
-                color=discord.Color.pink()
-            )
-            user_avatar_url = ctx.author.avatar.url
-            embed.set_thumbnail(url=user_avatar_url)
-            bot_avatar_url = bot.user.avatar.url
-            embed.set_footer(text="HanniBot - $help for commands",
-                             icon_url=bot_avatar_url)
-            await ctx.send(embed=embed)
+                    embed = discord.Embed(
+                        title="Role Name Updated",
+                        description=f"The role name has been updated successfully.",
+                        color=discord.Color.pink()
+                    )
+                    user_avatar_url = ctx.author.avatar.url
+                    embed.set_thumbnail(url=user_avatar_url)
+                    bot_avatar_url = bot.user.avatar.url
+                    embed.set_footer(
+                        text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
+                    await ctx.send(embed=embed)
+                except discord.Forbidden:
+                    embed = discord.Embed(
+                        title="Role Name Update Failed",
+                        description="You don't have permission to edit this role.",
+                        color=discord.Color.red()
+                    )
+                    await ctx.send(embed=embed)
 
         elif action == "color":
             role_id = None
-            role_id_result = cursor.execute(
-                f"SELECT role_id FROM guild_{ctx.guild.id} WHERE user_id = ?", (ctx.author.id,)).fetchone()
-            if role_id_result is not None and isinstance(role_id_result[0], int):
-                role_id = role_id_result[0]
+            role_id_result = execute_query(
+                f"SELECT role_id FROM guild_{ctx.guild.id} WHERE user_id = %s", (
+                    ctx.author.id,)
+            )
+
+            if isinstance(role_id_result, list) and role_id_result:
+                role_id = role_id_result[0][0]
                 custom_role = discord.utils.get(ctx.guild.roles, id=role_id)
 
             if custom_role is not None:
-                try:
-                    # Convert hex to int, skip the first character "#"
-                    color = discord.Color(int(args[1:], 16))
-                    await custom_role.edit(color=color)
+                # Check if the author of the command is the user who has the custom role
+                if ctx.author.top_role == custom_role:
+                    try:
+                        # Convert hex to int, skip the first character "#"
+                        color = discord.Color(int(args[1:], 16))
+                        await custom_role.edit(color=color)
 
-                    embed = discord.Embed(
-                        title="Role Color Updated",
-                        description=f"{custom_role.mention}'s color has been updated successfully.",
-                        color=color
-                    )
-                    user_avatar_url = ctx.author.avatar.url
-                    embed.set_thumbnail(url=user_avatar_url)
-                    bot_avatar_url = bot.user.avatar.url
-                    embed.set_footer(text="HanniBot - $help for commands",
-                                     icon_url=bot_avatar_url)
-                    await ctx.send(embed=embed)
-                except ValueError:
+                        embed = discord.Embed(
+                            title="Role Color Updated",
+                            description=f"{custom_role.mention}'s color has been updated successfully.",
+                            color=color,
+                        )
+                        user_avatar_url = ctx.author.avatar.url
+                        embed.set_thumbnail(url=user_avatar_url)
+                        bot_avatar_url = bot.user.avatar.url
+                        embed.set_footer(
+                            text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
+                        await ctx.send(embed=embed)
+                    except ValueError:
+                        embed = discord.Embed(
+                            title="Role Color Update Failed",
+                            description="Invalid color value. Please provide a valid hexadecimal color value.",
+                            color=discord.Color.red(),
+                        )
+                        user_avatar_url = ctx.author.avatar.url
+                        embed.set_thumbnail(url=user_avatar_url)
+                        bot_avatar_url = bot.user.avatar.url
+                        embed.set_footer(
+                            text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
+                        await ctx.send(embed=embed)
+                else:
                     embed = discord.Embed(
                         title="Role Color Update Failed",
-                        description="Invalid color value. Please provide a valid hexadecimal color value.",
-                        color=discord.Color.red()
+                        description="You don't have permission to edit this role. Only the user with the role can edit it.",
+                        color=discord.Color.red(),
                     )
-                    user_avatar_url = ctx.author.avatar.url
-                    embed.set_thumbnail(url=user_avatar_url)
-                    bot_avatar_url = bot.user.avatar.url
-                    embed.set_footer(text="HanniBot - $help for commands",
-                                     icon_url=bot_avatar_url)
                     await ctx.send(embed=embed)
             else:
                 embed = discord.Embed(
                     title="Role Color Update Failed",
-                    description="Please provide a valid hexadecimal color value.",
-                    color=discord.Color.red()
+                    description="You don't have a custom role to edit.",
+                    color=discord.Color.red(),
                 )
-                user_avatar_url = ctx.author.avatar.url
-                embed.set_thumbnail(url=user_avatar_url)
-                bot_avatar_url = bot.user.avatar.url
-                embed.set_footer(text="HanniBot - $help for commands",
-                                 icon_url=bot_avatar_url)
                 await ctx.send(embed=embed)
-
-        elif action == "delete":
-            role_id = cursor.execute(
-                f"SELECT role_id FROM guild_{ctx.guild.id} WHERE user_id = ?", (ctx.author.id,)).fetchone()
-            if role_id:
-                role_id = role_id[0]
-                custom_role = discord.utils.get(ctx.guild.roles, id=role_id)
-
-                try:
-                    await custom_role.delete()
-                    cursor.execute(f"DELETE FROM guild_{ctx.guild.id} WHERE user_id = ?",
-                                   (ctx.author.id,))
-                    conn.commit()
-
-                    embed = discord.Embed(
-                        title="Custom Role Deleted",
-                        description=f"Your role has been deleted.",
-                        color=discord.Color.pink()
-                    )
-                except discord.NotFound:
-                    embed = discord.Embed(
-                        title="Role Delete Failed",
-                        description="Your custom role has already been deleted.",
-                        color=discord.Color.red()
-                    )
-            else:
-                embed = discord.Embed(
-                    title="Role Delete Failed",
-                    description="You don't have a custom role to delete.",
-                    color=discord.Color.red()
-                )
-
-            user_avatar_url = ctx.author.avatar.url
-            embed.set_thumbnail(url=user_avatar_url)
-            bot_avatar_url = bot.user.avatar.url
-            embed.set_footer(text="HanniBot - $help for commands",
-                             icon_url=bot_avatar_url)
-            await ctx.send(embed=embed)
 
 
 @bot.command()
-async def addbanword(ctx, *, word):
+async def addbanword(ctx, regex: bool = False, *, word):
     if ctx.author.guild_permissions.manage_roles:
         # Fetch existing ban words for the guild
-        ban_words_result = cursor.execute(
-            f"SELECT ban_words FROM guild_{ctx.guild.id} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
+        ban_words_result = execute_query(
+            f"SELECT ban_words FROM guild_{ctx.guild.id} WHERE guild_id = %s", (ctx.guild.id,))
 
-        existing_ban_words = ban_words_result[0].split(
-            ',') if ban_words_result and ban_words_result[0] else []
+        if ban_words_result:
+            existing_ban_words = ban_words_result[0][0].split(
+                ',') if ban_words_result[0][0] else []
+        else:
+            existing_ban_words = []
 
         # Check if the word is already in the ban words list
         if word.lower() in existing_ban_words:
@@ -360,26 +413,40 @@ async def addbanword(ctx, *, word):
                 color=discord.Color.red()
             )
         else:
-            # Append the new ban word to the existing list$
-            existing_ban_words.append(word.lower())
+            if regex:
+                try:
+                    # Attempt to compile the word as a regex pattern
+                    re.compile(word)
+                    existing_ban_words.append(word)
+                except re.error:
+                    # Invalid regex pattern
+                    embed = discord.Embed(
+                        title="Invalid Regular Expression",
+                        description="The provided regular expression pattern is invalid.",
+                        color=discord.Color.red()
+                    )
+                    await ctx.send(embed=embed)
+                    return
+            else:
+                # Append the new ban word to the existing list as a plain word
+                existing_ban_words.append(word.lower())
 
             # Join the ban words into a single string
             updated_ban_words_str = ','.join(existing_ban_words)
 
-            cursor.execute(
-                f"UPDATE guild_{ctx.guild.id} SET ban_words = ? WHERE guild_id = ?", (updated_ban_words_str, ctx.guild.id))
-            conn.commit()
+            execute_query(
+                f"UPDATE guild_{ctx.guild.id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, ctx.guild.id), commit=True)
 
             embed = discord.Embed(
                 title="Banned Words",
-                description=f"**{word}** has been added to the guild's ban words list.",
+                description=f"{'Regex ' if regex else ''}**{word}** has been added to the guild's ban words list.",
                 color=discord.Color.pink()
             )
 
         user_avatar_url = ctx.author.avatar.url
         embed.set_thumbnail(url=user_avatar_url)
         bot_avatar_url = bot.user.avatar.url
-        embed.set_footer(text="HanniBot - $help for commands",
+        embed.set_footer(text="HanniBot - hn help for commands",
                          icon_url=bot_avatar_url)
         await ctx.send(embed=embed)
     else:
@@ -396,8 +463,8 @@ async def addbanword(ctx, *, word):
 async def listbanwords(ctx):
     if ctx.author.guild_permissions.manage_roles:
         guild_id = ctx.guild.id
-        ban_words_result = cursor.execute(
-            f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
+        ban_words_result = execute_query(
+            f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = %s", (ctx.guild.id,))
 
         if not ban_words_result or not ban_words_result[0]:
             embed = discord.Embed(
@@ -409,11 +476,11 @@ async def listbanwords(ctx):
             embed.set_thumbnail(url=user_avatar_url)
             bot_avatar_url = bot.user.avatar.url
             embed.set_footer(
-                text="HanniBot - $help for commands", icon_url=bot_avatar_url)
+                text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
             await ctx.send(embed=embed)
             return
 
-        ban_words = ban_words_result[0].split(',')
+        ban_words = ban_words_result[0][0].split(',')
         total_ban_words = len(ban_words)
 
         # Split and enumerate the banned words
@@ -475,13 +542,13 @@ async def listbanwords(ctx):
 async def removebanword(ctx, *, word):
     if ctx.author.guild_permissions.manage_roles:
         guild_id = ctx.guild.id
-        ban_words_result = cursor.execute(
-            f"SELECT ban_words FROM guild_{guild_id}").fetchone()
+        ban_words_result = execute_query(
+            f"SELECT ban_words FROM guild_{guild_id} WHERE guild_id = %s", (guild_id,))
 
         embed = discord.Embed(color=discord.Color.red())
 
         if ban_words_result and ban_words_result[0]:
-            ban_words = ban_words_result[0].split(',')
+            ban_words = ban_words_result[0][0].split(',')
             updated_ban_words = [
                 w for w in ban_words if w.strip().lower() != word.lower()]
 
@@ -491,9 +558,8 @@ async def removebanword(ctx, *, word):
             else:
                 updated_ban_words_str = ','.join(updated_ban_words)
 
-                cursor.execute(
-                    f"UPDATE guild_{guild_id} SET ban_words = ? WHERE guild_id = ?", (updated_ban_words_str, guild_id))
-                conn.commit()
+                execute_query(
+                    f"UPDATE guild_{guild_id} SET ban_words = %s WHERE guild_id = %s", (updated_ban_words_str, guild_id), commit=True)
 
                 embed.title = "Ban Word Removed"
                 embed.description = f"**{word}** has been removed from the ban words list."
@@ -506,7 +572,7 @@ async def removebanword(ctx, *, word):
         user_avatar_url = ctx.author.avatar.url
         embed.set_thumbnail(url=user_avatar_url)
         bot_avatar_url = bot.user.avatar.url
-        embed.set_footer(text="HanniBot - $help for commands",
+        embed.set_footer(text="HanniBot - hn help for commands",
                          icon_url=bot_avatar_url)
 
         await ctx.send(embed=embed)
@@ -529,14 +595,13 @@ async def server(ctx, role_type: str):
 
                 # Create a new table for the guild
                 guild_table_name = f"guild_{ctx.guild.id}"
-                cursor.execute(f'''CREATE TABLE IF NOT EXISTS {guild_table_name}
-                                (user_id INTEGER, guild_id INTEGER, role_id INTEGER, ban_words TEXT, 
-                                booster_role_id INTEGER, greeting_message TEXT, greeting_channel_id INTEGER, log_channel_id INTEGER)''')
+                execute_query(f'''CREATE TABLE IF NOT EXISTS {guild_table_name}
+                                (user_id BIGINT, guild_id BIGINT, role_id BIGINT, ban_words TEXT, 
+                                booster_role_id BIGINT, greeting_message TEXT, greeting_channel_id BIGINT, log_channel_id BIGINT)''')
 
                 # Insert the booster identifier role into the new table
-                cursor.execute(f"INSERT INTO {guild_table_name} (guild_id, booster_role_id) VALUES (?, ?)",
-                               (ctx.guild.id, role_mention.id))
-                conn.commit()
+                execute_query(f"INSERT INTO {guild_table_name} (guild_id, booster_role_id) VALUES (%s, %s)",
+                              (ctx.guild.id, role_mention.id), commit=True)
 
                 embed = discord.Embed(
                     title="Role Set",
@@ -548,7 +613,7 @@ async def server(ctx, role_type: str):
                 user_avatar_url = ctx.author.avatar.url
                 embed.set_thumbnail(url=user_avatar_url)
                 bot_avatar_url = bot.user.avatar.url
-                embed.set_footer(text="HanniBot - $help for commands",
+                embed.set_footer(text="HanniBot - hn help for commands",
                                  icon_url=bot_avatar_url)
                 await ctx.send(embed=embed)
             else:
@@ -558,24 +623,33 @@ async def server(ctx, role_type: str):
 
 
 @bot.event
-async def on_boost(guild, user, ctx):
-    global greeting_message
+async def on_boost(guild, user):
+    booster_role_id_result = execute_query(
+        f"SELECT booster_role_id FROM guild_{guild.id} WHERE guild_id = %s", (guild.id,))
 
-    booster_role_id = cursor.execute(
-        f"SELECT booster_role_id FROM guild_{ctx.guild.id} WHERE guild_id = ?", (ctx.guild.id,)).fetchone()
+    if booster_role_id_result and booster_role_id_result[0]:
+        booster_role_id = booster_role_id_result[0][0]
+        booster_role = discord.utils.get(guild.roles, id=booster_role_id)
 
-    if booster_role_id is not None and booster_role_id[0] is not None:
-        booster_role = discord.utils.get(guild.roles, id=booster_role_id[0])
-        if booster_role in user.roles:
-            greeting_channel_id = cursor.execute(
-                f"SELECT greeting_channel_id FROM guild_{ctx.guild.id} WHERE guild_id = ?", (guild.id,)).fetchone()
-            greeting_channel = guild.get_channel(
-                greeting_channel_id[0]) if greeting_channel_id and greeting_channel_id[0] else None
+        if booster_role and booster_role in user.roles:
+            greeting_channel_id_result = execute_query(
+                f"SELECT greeting_channel_id FROM guild_{guild.id} WHERE guild_id = %s", (guild.id,))
 
-            if greeting_channel:
-                greeting_message_plain = greeting_message.replace(
-                    "{user}", user.mention)
-                await greeting_channel.send(greeting_message_plain)
+            if greeting_channel_id_result and greeting_channel_id_result[0]:
+                greeting_channel_id = greeting_channel_id_result[0][0]
+                greeting_channel = guild.get_channel(greeting_channel_id)
+
+                if greeting_channel:
+                    # Check if a custom greeting message is set
+                    greeting_message_result = execute_query(
+                        f"SELECT greeting_message FROM guild_{guild.id} WHERE guild_id = %s", (guild.id,))
+
+                    if greeting_message_result and greeting_message_result[0]:
+                        greeting_message = greeting_message_result[0][0]
+
+                    greeting_message_plain = greeting_message.replace(
+                        "{user}", user.mention)
+                    await greeting_channel.send(greeting_message_plain)
 
 
 @bot.event
@@ -585,26 +659,36 @@ async def on_member_update(before, after):
         guild_table_name = f"guild_{guild_id}"
 
         try:
-            cursor.execute(f"SELECT 1 FROM {guild_table_name} LIMIT 1")
-        except sqlite3.OperationalError:
+            execute_query(f"SELECT 1 FROM {guild_table_name} LIMIT 1")
+        except mysql.OperationalError:
             return  # The table doesn't exist yet
 
-        booster_role_id = cursor.execute(
-            f"SELECT booster_role_id FROM {guild_table_name} WHERE guild_id = ?", (guild_id,)).fetchone()
+        booster_role_id_results = execute_query(
+            f"SELECT booster_role_id FROM {guild_table_name} WHERE guild_id = %s", (guild_id,))
 
-        if booster_role_id is None or booster_role_id[0] is None:
+        if not booster_role_id_results:
+            return  # No result found for booster_role_id
+
+        booster_role_id = booster_role_id_results[0][0]
+
+        if booster_role_id is None:
             return  # Booster identifier role not set
 
         booster_role = discord.utils.get(
-            after.guild.roles, id=booster_role_id[0])
+            after.guild.roles, id=booster_role_id)
 
         if booster_role in before.roles and booster_role not in after.roles:
-            role_id = cursor.execute(
-                f"SELECT role_id FROM {guild_table_name} WHERE user_id = ?", (after.id,)).fetchone()
+            role_id_results = execute_query(
+                f"SELECT role_id FROM {guild_table_name} WHERE user_id = %s", (after.id,))
+
+            if not role_id_results:
+                return  # No result found for role_id
+
+            role_id = role_id_results[0][0]
 
             if role_id:
                 custom_role = discord.utils.get(
-                    after.guild.roles, id=role_id[0])
+                    after.guild.roles, id=role_id)
 
                 if custom_role:
                     try:
@@ -613,33 +697,44 @@ async def on_member_update(before, after):
                         print(
                             f"An error occurred while deleting the custom role: {e}")
 
-                cursor.execute(
-                    f"DELETE FROM {guild_table_name} WHERE user_id = ?", (after.id,))
-                conn.commit()
+                # Now, delete the entire row for the user in the database
+                execute_query(
+                    f"DELETE FROM {guild_table_name} WHERE user_id = %s", (after.id,), commit=True)
 
-        log_channel_id = cursor.execute(
-            f"SELECT log_channel_id FROM {guild_table_name} WHERE guild_id = ?", (guild_id,)).fetchone()
-        log_channel = bot.get_channel(log_channel_id[0])  # Fetch the channel
+                print(
+                    f"Deleted role and row for user {after.name} ({after.id})")
+
+        log_channel_id_results = execute_query(
+            f"SELECT log_channel_id FROM {guild_table_name} WHERE guild_id = %s", (guild_id,))
+
+        if not log_channel_id_results:
+            return  # No result found for log_channel_id
+
+        log_channel_id = log_channel_id_results[0][0]
+
+        log_channel = bot.get_channel(log_channel_id)  # Fetch the channel
 
         if log_channel:
-            ban_words_result = cursor.execute(
-                f"SELECT ban_words FROM {guild_table_name} WHERE role_id = ?", (after.id,)).fetchone()
+            ban_words_results = execute_query(
+                f"SELECT ban_words FROM {guild_table_name} WHERE role_id = %s", (after.id,))
 
-            if ban_words_result and ban_words_result[0]:
-                ban_words = ban_words_result[0].split(',')
-                for word in ban_words:
-                    if word.lower() in after.name.lower():
-                        log_message = f"User {after.mention} attempted to change their role name to '{after.name}', which contains a banned word."
-                        await log_channel.send(log_message)
-                        break  # Stop checking if a banned word is found
+            if not ban_words_results:
+                return  # No result found for ban_words
+
+            ban_words = ban_words_results[0][0].split(',')
+
+            for word in ban_words:
+                if word.lower() in after.name.lower():
+                    log_message = f"User {after.mention} attempted to change their role name to '{after.name}', which contains a banned word."
+                    await log_channel.send(log_message)
+                    break  # Stop checking if a banned word is found
 
 
 @bot.command(name="setlog")
 async def set_log_channel(ctx, channel: discord.TextChannel):
     if ctx.author.guild_permissions.manage_roles:
-        cursor.execute(f"UPDATE guild_{ctx.guild.id} SET log_channel_id = ? WHERE guild_id = ?",
-                       (channel.id, ctx.guild.id))
-        conn.commit()
+        execute_query(f"UPDATE guild_{ctx.guild.id} SET log_channel_id = %s WHERE guild_id = %s",
+                      (channel.id, ctx.guild.id), commit=True)
         await ctx.send(f"Logging channel has been set to {channel.mention}.")
     else:
         # Inform the user that they don't have the required permission
@@ -654,8 +749,12 @@ async def set_log_channel(ctx, channel: discord.TextChannel):
 @bot.event
 async def on_guild_role_update(before, after):
     if before.name != after.name:
-        ban_words_result = cursor.execute(
-            f"SELECT ban_words FROM guild_{after.guild.id} WHERE role_id = ?", (after.id,)).fetchone()
+        guild_id = after.guild.id
+        guild_table_name = f"guild_{guild_id}"
+
+        ban_words_result = execute_query(
+            f"SELECT ban_words FROM {guild_table_name} WHERE guild_id = %s", (guild_id,), fetchone=True)
+
         if ban_words_result and ban_words_result[0]:
             ban_words = ban_words_result[0].split(',')
             for word in ban_words:
@@ -669,7 +768,7 @@ bot.remove_command("help")
 @bot.command()
 async def help(ctx):
     help_commands = [
-        ("```yaml\n$booster", "to list booster commands.```"),
+        ("```yaml\nhn booster", "to list booster commands.```"),
     ]
 
     embed = discord.Embed(
@@ -699,18 +798,18 @@ async def booster(ctx):
     booster_commands = [
         ("🚀 **Booster Commands**",
          "```yaml\n"
-         "$claim\n  ↳ Claim a custom role if you have the booster identifier role.\n"
-         "$role name <new_name>\n  ↳ Change the name of your custom role.\n"
-         "$role color <#FFFFFF>\n  ↳ Change the color of your custom role.\n"
-         "$role delete\n  ↳ Delete your custom role.\n"
-         "$addbanword <word>\n  ↳ Add a banned word to your custom role's ban list.\n"
-         "$listbanwords\n  ↳ List all banned words in your custom roles' ban lists.\n"
-         "$removebanword <word>\n  ↳ Remove a banned word from your custom role's ban list.\n"
-         "$server <boostrole> <role_mention>\n  ↳ Set a specific role as the booster identifier role.\n"
-         "$greet message\n  ↳ Sets a text greeting message to the boosters.\n"
-         "$greet channel <channel>\n  ↳ a channel that will receive the messages.\n"
-         "$greet test\n  ↳ Sends a sample greeting message in this channel.\n"
-         "$setlog <channel>\n  ↳ a channel that will receive the logs for the role banned words.\n"
+         "hn claim\n  ↳ Claim a custom role if you have the booster identifier role.\n"
+         "hn role name <new_name>\n  ↳ Change the name of your custom role.\n"
+         "hn role color <#FFFFFF>\n  ↳ Change the color of your custom role.\n"
+         "hn role delete\n  ↳ Delete your custom role.\n"
+         "hn addbanword true <regex>\n  ↳ Add a banned regex to your custom role's ban list.\n"
+         "hn listbanwords\n  ↳ List all banned words in your custom roles' ban lists.\n"
+         "hn removebanword <word>\n  ↳ Remove a banned word from your custom role's ban list.\n"
+         "hn server <boostrole> <role_mention>\n  ↳ Set a specific role as the booster identifier role.\n"
+         "hn greet message\n  ↳ Sets a text greeting message to the boosters.\n"
+         "hn greet channel <channel>\n  ↳ a channel that will receive the messages.\n"
+         "hn greet test\n  ↳ Sends a sample greeting message in this channel.\n"
+         "hn setlog <channel>\n  ↳ a channel that will receive the logs for the role banned words.\n"
          "```"),
     ]
 
@@ -738,4 +837,9 @@ async def booster(ctx):
     await ctx.send(embed=embed)
 
 
-bot.run('MTE0NDE2NDM4ODE1NzI3MjEzNw.G1r_lp.BxIzRaqOJQ9aRHnEsXd3LRnpkPFHTHh8cwysWw')
+@bot.event
+async def on_disconnect():
+    execute_query.close()
+
+
+bot.run('MTE0NDgwOTk0NjExOTE0MzUzNQ.GekBmF.vxb8TsdwC5VvlsC5qqK7MvnrtgM5HbBYOqTWYI')
