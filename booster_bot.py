@@ -15,9 +15,9 @@ def execute_query(query, values=None, fetchone=False, commit=False):
     db_connection = None
     try:
         db_connection = mysql.connector.connect(
-            host="containers-us-west-48.railway.app",
+            host="containers-us-west-80.railway.app",
             user="root",
-            password="K7zECJ9XZBEeWKxMdblM",
+            password="wdF70jjesWe9qSdJEVeM",
             database="railway"
         )
         cursor = db_connection.cursor()
