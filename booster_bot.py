@@ -348,18 +348,18 @@ async def role(ctx, action, *, args=""):
                         if log_channel:
                             await log_channel.send(embed=embed)
 
-                    error_embed = discord.Embed(
-                        title="Role Name Update Failed",
-                        description=f"The role name contains a banned word: `{word}`.",
-                        color=discord.Color.red()
-                    )
-                    user_avatar_url = ctx.author.avatar.url
-                    error_embed.set_thumbnail(url=user_avatar_url)
-                    bot_avatar_url = bot.user.avatar.url
-                    error_embed.set_footer(
-                        text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
-                    await ctx.send(embed=error_embed)
-                    return
+                        error_embed = discord.Embed(
+                            title="Role Name Update Failed",
+                            description=f"The role name contains a banned word: `{word}`.",
+                            color=discord.Color.red()
+                        )
+                        user_avatar_url = ctx.author.avatar.url
+                        error_embed.set_thumbnail(url=user_avatar_url)
+                        bot_avatar_url = bot.user.avatar.url
+                        error_embed.set_footer(
+                            text="HanniBot - hn help for commands", icon_url=bot_avatar_url)
+                        await ctx.send(embed=error_embed)
+                        return
 
             custom_role = discord.utils.get(ctx.guild.roles, name=new_name)
 
