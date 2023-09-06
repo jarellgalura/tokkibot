@@ -27,7 +27,7 @@ client = discord.Client(intents=intents)
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "ja.dmp_"  # Replace with your Instagram username
+INSTAGRAM_USERNAME = "praychandesu"  # Replace with your Instagram username
 
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
@@ -237,6 +237,8 @@ async def retrieve_instagram_media(message):
 
             # Combine caption, shortened link, and media files
             caption_message = f"{caption_with_info}\n<{shortened_link}>"
+
+            await asyncio.sleep(1)
 
             # Send media files along with caption and shortened link in a single message
             await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
