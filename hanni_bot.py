@@ -18,7 +18,7 @@ from hanniinstagram import *
 
 
 # Your bot's token
-TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9QUlB.UfLDKULtmSlbrb33YT1mCJ7n1sEb8puQobX_jI'
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU'
 
 intents = discord.Intents.default()
 intents.message_content = True
