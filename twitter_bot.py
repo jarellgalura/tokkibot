@@ -15,6 +15,10 @@ async def fetch_media(url):
     # Determine the file extension based on URL content type
     file_extension = ".jpg" if url.endswith(".jpg") else ".mp4"
 
+    # Modify the URL to use a high-quality format for images
+    if file_extension == ".jpg":
+        url += "?format=jpg&name=4096x4096"
+
     # Download the media and create a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
         temp_file.write(requests.get(url).content)
