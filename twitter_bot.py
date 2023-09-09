@@ -3,6 +3,7 @@ import requests
 import asyncio
 import tempfile
 from discord.ext import commands
+from discord.ui import Button, View  # Import Button and View
 from urllib.parse import urlsplit, urlunsplit
 
 # Create a bot instance
@@ -82,8 +83,14 @@ async def hn_tweet_link(ctx, tweet_link):
                 # Use asyncio.gather to download media files concurrently
                 media_files = await asyncio.gather(*[fetch_media(url) for url in media_files_urls])
 
-                # Send the modified caption as a reply to the user
-                await ctx.reply(f"{full_caption.strip()}\n<{original_link}>", files=media_files, allowed_mentions=discord.AllowedMentions.none())
+                # Create a link button to the original tweet
+                view = View()
+                tweet_button = Button(
+                    style=discord.ButtonStyle.link, label="View Post", url=original_link)  # Use discord.ButtonStyle.link
+                view.add_item(tweet_button)
+
+                # Send the modified caption with the link button as a reply to the user
+                await ctx.reply(f"{full_caption.strip()}", files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
             else:
                 # Send an error message if there is no media
