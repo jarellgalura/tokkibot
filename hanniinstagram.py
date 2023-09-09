@@ -11,10 +11,6 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 
 # Define cooldown duration (in seconds)
-COOLDOWN_DURATION = 5
-
-# Store last link message timestamp per user
-user_last_link_time = {}
 
 
 @client.event

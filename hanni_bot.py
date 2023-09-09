@@ -9,13 +9,17 @@ from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredential
 import getpass
 import time
 import random
+import string
+import tempfile
+import uuid
+from urllib.parse import urlparse, urljoin
+from typing import Dict, Any
 
 # Import the TikTok script
 from tiktok_bot import TikTok
 
 # Import the Instagram script
 from hanniinstagram import *
-
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU'
@@ -27,66 +31,59 @@ client = discord.Client(intents=intents)
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "ja.dmp_"  # Replace with your Instagram username
+INSTAGRAM_USERNAME = "jarellgalura_"  # Replace with your Instagram username
 
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
     filename_pattern="session-{username}", max_connection_attempts=1)
 
+user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
+COOLDOWN_DURATION = 1
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
+# Function to generate a random user agent
 
-    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/.+'
-    tiktok_urls = re.findall(tiktok_pattern, message.content)
 
-    async with aiohttp.ClientSession() as session:
-        for tiktok_url in tiktok_urls:
-            try:
-                tiktok_video = await tiktok.get_video(tiktok_url)
-                video_content = await tiktok.download_video_content(tiktok_video.video_url, session)
-                async with message.channel.typing():
-                    # Create a temporary file using tempfile.NamedTemporaryFile
-                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
-                        temp_file.write(video_content)
-                        temp_file.seek(0)
+def generate_random_user_agent() -> str:
+    platform = random.choice(
+        ['Windows NT 10.0', 'Macintosh', 'Linux', 'iPhone', 'iPad', 'Android'])
+    chrome_version = f'{random.randint(80, 100)}.0.{random.randint(1000, 9999)}.{random.randint(100, 999)}'
+    safari_version = f'{random.randint(10, 15)}_{random.randint(0, 9)}'
+    return f'Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/{safari_version}'
 
-                        # Remove hashtags from the description
-                        description_without_hashtags = re.sub(
-                            r'#\w+', '', tiktok_video.description)
+# Function to generate random iPhone headers
 
-                        # Create a File object from the temporary file
-                        video_file = discord.File(temp_file.name)
-                        tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
-                        response = (
-                            f"{tiktok_emote_syntax} @{tiktok_video.user}\n\n"
-                            f"{description_without_hashtags}"
-                        )
 
-                        # Send the response to the user without mentioning them
-                        await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
-                        await message.edit(suppress=True)
-            except Exception as e:
-                await message.channel.send(f"An error occurred: {e}")
-
-    if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
-        user_id = message.author.id
-        current_time = datetime.now()
-
-        if user_id in user_last_link_time:
-            time_since_last_link = current_time - user_last_link_time[user_id]
-            if time_since_last_link < timedelta(seconds=COOLDOWN_DURATION):
-                await message.channel.send("Please wait before sending another link.")
-                return
-
-        user_last_link_time[user_id] = current_time
-        await retrieve_instagram_media(message)
+def generate_random_iphone_headers() -> Dict[str, Any]:
+    headers = {
+        'User-Agent': generate_random_user_agent(),
+        'x-ads-opt-out': '1',
+        'x-bloks-is-panorama-enabled': 'true',
+        'x-bloks-version-id': ''.join(random.choices(string.ascii_lowercase + string.digits, k=32)),
+        'x-fb-client-ip': 'True',
+        'x-fb-connection-type': 'wifi',
+        'x-fb-http-engine': 'Liger',
+        'x-fb-server-cluster': 'True',
+        'x-fb': '1',
+        'x-ig-abr-connection-speed-kbps': str(random.randint(1, 10)),
+        'x-ig-app-id': ''.join(random.choices(string.digits, k=15)),
+        'x-ig-app-locale': 'en-US',
+        'x-ig-app-startup-country': 'US',
+        'x-ig-bandwidth-speed-kbps': '0.000',
+        'x-ig-capabilities': '36r/F/8=',
+        'x-ig-connection-speed': f'{random.randint(1000, 20000)}kbps',
+        'x-ig-connection-type': 'WiFi',
+        'x-ig-device-locale': 'en-US',
+        'x-ig-mapped-locale': 'en-US',
+        'x-ig-timezone-offset': str(random.randint(-720, 720)),
+        'x-ig-www-claim': '0',
+        'x-pigeon-session-id': str(uuid.uuid4()),
+        'x-tigon-is-retry': 'False',
+        'x-whatsapp': '0'
+    }
+    return headers
 
 
 async def login_instagram():
-
     # Load or create a session
     session_file_path = os.path.join(
         INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
@@ -183,10 +180,9 @@ async def retrieve_instagram_media(message):
         "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36",
 
         # Mobile user agents
-        "Mozilla/5.0 (Linux; Android 10; SM-G975U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (Linux; Android 11; Pixel 4 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36",
+        generate_random_user_agent(),  # Use the random user agent function here
+        generate_random_user_agent(),  # Use the random user agent function here
+        generate_random_user_agent(),  # Use the random user agent function here
 
         # Chrome on desktop user agents
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
@@ -194,10 +190,8 @@ async def retrieve_instagram_media(message):
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
     ]
 
-    headers = {
-        # Randomly select a user agent
-        'User-Agent': random.choice(USER_AGENTS),
-    }
+    # Use the random iPhone headers function here
+    headers = generate_random_iphone_headers()
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
@@ -245,6 +239,57 @@ async def retrieve_instagram_media(message):
 
             # Delete the original Instagram link message
             await message.delete()
+
+
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
+
+    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/.+'
+    tiktok_urls = re.findall(tiktok_pattern, message.content)
+
+    async with aiohttp.ClientSession() as session:
+        for tiktok_url in tiktok_urls:
+            try:
+                tiktok_video = await tiktok.get_video(tiktok_url)
+                video_content = await tiktok.download_video_content(tiktok_video.video_url, session)
+                async with message.channel.typing():
+                    # Create a temporary file using tempfile.NamedTemporaryFile
+                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
+                        temp_file.write(video_content)
+                        temp_file.seek(0)
+
+                        # Remove hashtags from the description
+                        description_without_hashtags = re.sub(
+                            r'#\w+', '', tiktok_video.description)
+
+                        # Create a File object from the temporary file
+                        video_file = discord.File(temp_file.name)
+                        tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
+                        response = (
+                            f"{tiktok_emote_syntax} @{tiktok_video.user}\n\n"
+                            f"{description_without_hashtags}"
+                        )
+
+                        # Send the response to the user without mentioning them
+                        await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
+                        await message.edit(suppress=True)
+            except Exception as e:
+                await message.channel.send(f"An error occurred: {e}")
+
+    if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
+        user_id = message.author.id
+        current_time = datetime.now()
+
+        if user_id in user_last_link_time:
+            time_since_last_link = current_time - user_last_link_time[user_id]
+            if time_since_last_link < timedelta(seconds=COOLDOWN_DURATION):
+                await message.channel.send("Please wait before sending another link.")
+                return
+
+        user_last_link_time[user_id] = current_time
+        await retrieve_instagram_media(message)
 
 
 @client.event
