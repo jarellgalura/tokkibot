@@ -14,6 +14,7 @@ import tempfile
 import uuid
 from urllib.parse import urlparse, urljoin
 from typing import Dict, Any
+from discord.ui import Button, View
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -230,12 +231,17 @@ async def retrieve_instagram_media(message):
             shortened_link = urljoin(url, url.split('?')[0])
 
             # Combine caption, shortened link, and media files
-            caption_message = f"{caption_with_info}\n<{shortened_link}>"
+            caption_message = f"{caption_with_info}"
+
+            view = View()
+            ig_button = Button(
+                style=discord.ButtonStyle.link, label="View Post", url=shortened_link)  # Use discord.ButtonStyle.link
+            view.add_item(ig_button)
 
             await asyncio.sleep(1)
 
             # Send media files along with caption and shortened link in a single message
-            await message.reply(content=caption_message, files=media_files, allowed_mentions=discord.AllowedMentions.none())
+            await message.reply(content=caption_message, files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
             # Delete the original Instagram link message
             await message.delete()
