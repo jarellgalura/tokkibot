@@ -4,7 +4,7 @@ import asyncio
 import tempfile
 from discord.ext import commands
 from discord.ui import Button, View  # Import Button and View
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit, urljoin
 
 # Create a bot instance
 intents = discord.Intents.all()
@@ -73,8 +73,17 @@ async def hn_tweet_link(ctx, tweet_link):
             full_caption = f"{x_emote_syntax} `{formatted_date}` **@{username}**\n\n {tweet_caption}"
 
             # Get the original Twitter link without any query parameters
-            original_link = urlunsplit(
-                urlsplit(f"{tweet_link}")[:3] + ('', '',))
+            # Check if the link starts with "x.com/"
+            if tweet_link.startswith("x.com/"):
+                # If it starts with "x.com/", remove it and create the original_link
+                original_link = urljoin(
+                    "https://twitter.com/", tweet_link.replace('x.com/', ''))
+            else:
+                # If it starts with "https://twitter.com/", use it directly as the original_link
+                original_link = urljoin("https://twitter.com/", tweet_link)
+
+             # Remove query parameters (everything after "?") from the original_link
+            original_link = original_link.split("?")[0]
 
             if media_urls or video_urls:
                 # Create a list of media file URLs to download concurrently
