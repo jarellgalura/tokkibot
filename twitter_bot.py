@@ -32,7 +32,7 @@ async def on_ready():
     print(f"We have logged in as {bot.user}")
 
 
-@bot.command(name="twt")
+@bot.command(name="twt", aliases=["x"])
 async def hn_tweet_link(ctx, tweet_link):
     # Remove the leading "https://twitter.com/" from the tweet link
     tweet_link = tweet_link.replace("https://twitter.com/", "")
@@ -74,7 +74,7 @@ async def hn_tweet_link(ctx, tweet_link):
 
             # Get the original Twitter link without any query parameters
             original_link = urlunsplit(
-                urlsplit(f"https://twitter.com/{tweet_link}")[:3] + ('', '',))
+                urlsplit(f"{tweet_link}")[:3] + ('', '',))
 
             if media_urls or video_urls:
                 # Create a list of media file URLs to download concurrently
