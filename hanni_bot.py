@@ -252,7 +252,12 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/.+'
+    # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
+    if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
+        return
+
+    # Modified regex pattern
+    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^<> ]+'
     tiktok_urls = re.findall(tiktok_pattern, message.content)
 
     async with aiohttp.ClientSession() as session:
