@@ -70,7 +70,7 @@ async def hn_tweet_link(ctx, tweet_link):
             x_emote_syntax = "<:x:1149749183755067513>"
 
             # Combine the username, date, and caption
-            full_caption = f"{x_emote_syntax} `{formatted_date}` **@{username}**\n\n {tweet_caption}"
+            full_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n {tweet_caption}"
 
             # Get the original Twitter link without any query parameters
             # Check if the link starts with "x.com/"
