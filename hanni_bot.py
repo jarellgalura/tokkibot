@@ -15,6 +15,7 @@ import uuid
 from urllib.parse import urlparse, urljoin
 from typing import Dict, Any
 from discord.ui import Button, View
+import aiohttp
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -41,45 +42,30 @@ L = instaloader.Instaloader(
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
 COOLDOWN_DURATION = 1
 
-# Function to generate a random user agent
+# Function to generate a common browser user agent
 
 
-def generate_random_user_agent() -> str:
-    platform = random.choice(
-        ['Windows NT 10.0', 'Macintosh', 'Linux', 'iPhone', 'iPad', 'Android'])
-    chrome_version = f'{random.randint(80, 100)}.0.{random.randint(1000, 9999)}.{random.randint(100, 999)}'
-    safari_version = f'{random.randint(10, 15)}_{random.randint(0, 9)}'
-    return f'Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/{safari_version}'
+def generate_browser_user_agent() -> str:
+    return (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/91.0.4472.124 Safari/537.36"
+    )
 
-# Function to generate random iPhone headers
+# Function to generate browser headers
 
 
-def generate_random_iphone_headers() -> Dict[str, Any]:
+def generate_browser_headers() -> Dict[str, Any]:
     headers = {
-        'User-Agent': generate_random_user_agent(),
-        'x-ads-opt-out': '1',
-        'x-bloks-is-panorama-enabled': 'true',
-        'x-bloks-version-id': ''.join(random.choices(string.ascii_lowercase + string.digits, k=32)),
-        'x-fb-client-ip': 'True',
-        'x-fb-connection-type': 'wifi',
-        'x-fb-http-engine': 'Liger',
-        'x-fb-server-cluster': 'True',
-        'x-fb': '1',
-        'x-ig-abr-connection-speed-kbps': str(random.randint(1, 10)),
-        'x-ig-app-id': ''.join(random.choices(string.digits, k=15)),
-        'x-ig-app-locale': 'en-US',
-        'x-ig-app-startup-country': 'US',
-        'x-ig-bandwidth-speed-kbps': '0.000',
-        'x-ig-capabilities': '36r/F/8=',
-        'x-ig-connection-speed': f'{random.randint(1000, 20000)}kbps',
-        'x-ig-connection-type': 'WiFi',
-        'x-ig-device-locale': 'en-US',
-        'x-ig-mapped-locale': 'en-US',
-        'x-ig-timezone-offset': str(random.randint(-720, 720)),
-        'x-ig-www-claim': '0',
-        'x-pigeon-session-id': str(uuid.uuid4()),
-        'x-tigon-is-retry': 'False',
-        'x-whatsapp': '0'
+        'User-Agent': generate_browser_user_agent(),
+        'referer': 'https://www.instagram.com/',
+        'authority': 'www.instagram.com',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.5',
+        'upgrade-insecure-requests': '1',
+        'cache-control': 'max-age=0',
+        'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="96", "Google Chrome";v="96"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': 'Windows',
     }
     return headers
 
@@ -175,24 +161,10 @@ async def retrieve_instagram_media(message):
 
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{caption_without_hashtags}"
-    USER_AGENTS = [
-        # Desktop user agents (existing agents)
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36",
 
-        # Mobile user agents
-        generate_random_user_agent(),  # Use the random user agent function here
-        generate_random_user_agent(),  # Use the random user agent function here
-        generate_random_user_agent(),  # Use the random user agent function here
+    # Use the common browser headers
+    headers = generate_browser_headers()
 
-        # Chrome on desktop user agents
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
-    ]
-
-    # Use the random iPhone headers function here
-    headers = generate_random_iphone_headers()
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
@@ -279,7 +251,7 @@ async def on_message(message):
                         video_file = discord.File(temp_file.name)
                         tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
                         response = (
-                            f"{tiktok_emote_syntax} @{tiktok_video.user}\n\n"
+                            f"{tiktok_emote_syntax} **@{tiktok_video.user}**\n\n"
                             f"{description_without_hashtags}"
                         )
 
