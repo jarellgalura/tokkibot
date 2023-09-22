@@ -147,7 +147,7 @@ async def retrieve_instagram_media(message):
     post = instaloader.Post.from_shortcode(L.context, shortcode)
 
     username = post.owner_username
-    post_date = post.date.strftime('%Y-%m-%d %H:%M:%S')
+    post_date = post.date.strftime('%Y-%m-%d')
     caption = post.caption if post.caption else "No caption available."
 
     # Remove hashtags from the caption
@@ -174,7 +174,7 @@ async def retrieve_instagram_media(message):
             media_urls.append(post.url)
 
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
-    caption_with_info = f"{instagram_emote_syntax} **@{username}** {post_date}\n\n{caption_without_hashtags}"
+    caption_with_info = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{caption_without_hashtags}"
     USER_AGENTS = [
         # Desktop user agents (existing agents)
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
