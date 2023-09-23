@@ -66,6 +66,10 @@ def generate_browser_headers() -> Dict[str, Any]:
         'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="96", "Google Chrome";v="96"',
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': 'Windows',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
     }
     return headers
 
@@ -210,7 +214,7 @@ async def retrieve_instagram_media(message):
                 style=discord.ButtonStyle.link, label="View Post", url=shortened_link)  # Use discord.ButtonStyle.link
             view.add_item(ig_button)
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
 
             # Send media files along with caption and shortened link in a single message
             await message.reply(content=caption_message, files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
