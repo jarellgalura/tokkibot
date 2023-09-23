@@ -2,9 +2,11 @@ import discord
 import requests
 import asyncio
 import tempfile
+import mtranslate
 from discord.ext import commands
-from discord.ui import Button, View  # Import Button and View
+from discord.ui import Button, View
 from urllib.parse import urlsplit, urlunsplit, urljoin
+import re
 
 # Create a bot instance
 intents = discord.Intents.all()
@@ -69,6 +71,9 @@ async def hn_tweet_link(ctx, tweet_link):
 
             x_emote_syntax = "<:x:1149749183755067513>"
 
+            # Remove '#' from the caption
+            tweet_caption = re.sub(r'#\w+', '', tweet_caption)
+
             # Combine the username, date, and caption
             full_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n {tweet_caption}"
 
@@ -95,11 +100,50 @@ async def hn_tweet_link(ctx, tweet_link):
                 # Create a link button to the original tweet
                 view = View()
                 tweet_button = Button(
-                    style=discord.ButtonStyle.link, label="View Post", url=original_link)  # Use discord.ButtonStyle.link
+                    style=discord.ButtonStyle.link, label="View Post", url=original_link)
                 view.add_item(tweet_button)
 
-                # Send the modified caption with the link button as a reply to the user
-                await ctx.reply(f"{full_caption.strip()}", files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
+                # Create the Translation button conditionally
+                translation_button = None
+                translated = False  # Flag to track if translation is applied
+
+                if any(char >= '가' and char <= '힣' for char in tweet_caption):
+                    button_label = "Kr/En"
+                    translation_button = Button(
+                        style=discord.ButtonStyle.danger, label=button_label)
+
+                    # Define a callback function for the Translation button
+                    async def translate_callback(interaction):
+                        nonlocal translated
+                        await interaction.response.defer()
+
+                        if translated:
+                            # Revert to the original caption
+                            new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{tweet_caption}"
+                            button_label = "Translation"
+                        else:
+                            # Translate the caption
+                            translated_caption = mtranslate.translate(
+                                tweet_caption, "en", "auto")
+                            new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{translated_caption}"
+                            button_label = "Original"
+
+                        # Update the message content and button label
+                        await original_caption_message.edit(content=new_caption)
+                        translation_button.label = button_label
+                        translated = not translated
+
+                    # Add the callback to the Translation button
+                    translation_button.callback = translate_callback
+
+                    # Add the Translation button to the view
+                    view.add_item(translation_button)
+
+                # Send the original caption message with buttons as a reply to the user
+                original_caption_message = await ctx.send(f"{full_caption.strip()}", files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
+
+                # Delete the user's message containing the command
+                await ctx.message.delete()
 
             else:
                 # Send an error message if there is no media
@@ -107,9 +151,6 @@ async def hn_tweet_link(ctx, tweet_link):
 
                 # Send the same error message to the channel
                 await ctx.send(error_message)
-
-            # Delete the user's message containing the command
-            await ctx.message.delete()
 
         else:
             await ctx.send("Failed to fetch tweet data")
