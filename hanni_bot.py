@@ -1,3 +1,4 @@
+import mtranslate
 import asyncio
 import discord
 import instaloader
@@ -16,6 +17,7 @@ from urllib.parse import urlparse, urljoin
 from typing import Dict, Any
 from discord.ui import Button, View
 import aiohttp
+from datetime import datetime, timedelta
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -172,6 +174,43 @@ async def retrieve_instagram_media(message):
     async with aiohttp.ClientSession(headers=headers) as session:
         # Display typing status while processing
         async with message.channel.typing():
+            # Check if there is Korean text in the caption
+            has_korean_text = any(char >= '가' and char <=
+                                  '힣' for char in caption_without_hashtags)
+
+            # Create a translation button conditionally
+            translation_button = None
+            translated = False  # Flag to track if translation is applied
+
+            if has_korean_text:
+                button_label = "Kr/En"
+                translation_button = Button(
+                    style=discord.ButtonStyle.danger, label=button_label)
+
+                # Define a callback function for the Translation button
+                async def translate_callback(interaction):
+                    nonlocal translated
+                    await interaction.response.defer()
+
+                    if translated:
+                        # Revert to the original caption
+                        new_caption = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{caption_without_hashtags}"
+                        button_label = "Kr/En"
+                    else:
+                        # Translate the caption
+                        translated_caption = mtranslate.translate(
+                            caption_without_hashtags, "en", "auto")
+                        new_caption = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{translated_caption}"
+                        button_label = "Original"
+
+                    # Update the message content and button label
+                    await original_message.edit(content=new_caption)
+                    translation_button.label = button_label
+                    translated = not translated
+
+                # Add the callback to the Translation button
+                translation_button.callback = translate_callback
+
             # Rest of your media retrieval and sending code
             tasks = []
             media_data_results = []
@@ -214,10 +253,11 @@ async def retrieve_instagram_media(message):
                 style=discord.ButtonStyle.link, label="View Post", url=shortened_link)  # Use discord.ButtonStyle.link
             view.add_item(ig_button)
 
-            await asyncio.sleep(2)
+            if translation_button:
+                view.add_item(translation_button)
 
             # Send media files along with caption and shortened link in a single message
-            await message.reply(content=caption_message, files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
+            original_message = await message.reply(content=caption_message, files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
             # Delete the original Instagram link message
             await message.delete()
