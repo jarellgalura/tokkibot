@@ -28,7 +28,7 @@ from hanniinstagram import *
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU'
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
@@ -43,6 +43,31 @@ L = instaloader.Instaloader(
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
 COOLDOWN_DURATION = 1
+
+
+COMMAND_PREFIX = "hn say "
+
+
+async def hn_say(channel, target_channel_mention, *args):
+    # Check if the target_channel_mention is a valid channel mention
+    if not target_channel_mention.startswith("<#") or not target_channel_mention.endswith(">"):
+        await channel.send("Usage: hn say <#TargetChannel> [Message...]")
+        return
+
+    # Extract the channel ID from the mention
+    target_channel_id = int(target_channel_mention[2:-1])
+
+    # Find the target channel by ID
+    target_channel = channel.guild.get_channel(target_channel_id)
+
+    if target_channel is not None:
+        # Join the remaining arguments into a single message content
+        message_content = ' '.join(args)
+
+        # Send the message to the target channel
+        await target_channel.send(message_content)
+    else:
+        await channel.send("Target channel not found.")
 
 # Function to generate a common browser user agent
 
@@ -267,6 +292,20 @@ async def retrieve_instagram_media(message):
 async def on_message(message):
     if message.author == client.user:
         return
+
+    if message.content.startswith(COMMAND_PREFIX):
+        # Split the message content into parts
+        parts = message.content.split()
+
+        if len(parts) < 3:
+            await message.channel.send("Usage: hn say <#TargetChannel> [Message...]")
+        else:
+            # Extract the target_channel_mention and remaining arguments
+            target_channel_mention = parts[2]
+            remaining_args = parts[3:]
+
+            # Call hn_say function with the extracted arguments
+            await hn_say(message.channel, target_channel_mention, *remaining_args)
 
     # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
     if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
