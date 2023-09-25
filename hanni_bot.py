@@ -48,26 +48,38 @@ COOLDOWN_DURATION = 1
 COMMAND_PREFIX = "hn say "
 
 
-async def hn_say(channel, target_channel_mention, *args):
-    # Check if the target_channel_mention is a valid channel mention
-    if not target_channel_mention.startswith("<#") or not target_channel_mention.endswith(">"):
-        await channel.send("Usage: hn say <#TargetChannel> [Message...]")
-        return
+async def say_command(message):
+    # Extract the content of the message after the "hn say" prefix
+    input_text = message.content[len(COMMAND_PREFIX):].strip()
 
-    # Extract the channel ID from the mention
-    target_channel_id = int(target_channel_mention[2:-1])
+    # Check if the user has specified a target channel
+    if input_text.startswith("<#"):
+        # Find the channel mention
+        channel_mention = input_text.split()[0].strip()
 
-    # Find the target channel by ID
-    target_channel = channel.guild.get_channel(target_channel_id)
+        # Remove the channel mention from the input text
+        input_text = input_text[len(channel_mention):].strip()
 
-    if target_channel is not None:
-        # Join the remaining arguments into a single message content
-        message_content = ' '.join(args)
+        # Get the target channel from the mention
+        channel_id = int(channel_mention[2:-1])  # Extract the channel ID
+        target_channel = message.guild.get_channel(channel_id)
 
-        # Send the message to the target channel
-        await target_channel.send(message_content)
-    else:
-        await channel.send("Target channel not found.")
+        if target_channel:
+            # Send the message to the specified channel
+            await target_channel.send(input_text)
+
+            # Send a success message in the current channel
+            await message.channel.send(f"Message sent to {target_channel.mention}.")
+            return
+        else:
+            # Send an error message if the specified channel does not exist
+            await message.channel.send("Error: The specified channel does not exist.")
+            return
+
+    # If no channel is specified or not found, send the message to the current channel
+    await message.channel.send(input_text)
+    await message.channel.send("Message sent to this channel.")
+
 
 # Function to generate a common browser user agent
 
@@ -293,19 +305,10 @@ async def on_message(message):
     if message.author == client.user:
         return
 
+        # Check if the message starts with the command prefix
     if message.content.startswith(COMMAND_PREFIX):
-        # Split the message content into parts
-        parts = message.content.split()
-
-        if len(parts) < 3:
-            await message.channel.send("Usage: hn say <#TargetChannel> [Message...]")
-        else:
-            # Extract the target_channel_mention and remaining arguments
-            target_channel_mention = parts[2]
-            remaining_args = parts[3:]
-
-            # Call hn_say function with the extracted arguments
-            await hn_say(message.channel, target_channel_mention, *remaining_args)
+        await say_command(message)
+        return
 
     # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
     if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
