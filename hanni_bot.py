@@ -49,6 +49,11 @@ COMMAND_PREFIX = "hn say "
 
 
 async def say_command(message):
+    # Check if the user has the "Manage Channels" permission
+    if not message.author.guild_permissions.manage_channels:
+        await message.channel.send("You do not have permission to use this command.")
+        return
+
     # Extract the content of the message after the "hn say" prefix
     input_text = message.content[len(COMMAND_PREFIX):].strip()
 
