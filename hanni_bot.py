@@ -18,6 +18,7 @@ from typing import Dict, Any
 from discord.ui import Button, View
 import aiohttp
 from datetime import datetime, timedelta
+import sqlite3
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -32,6 +33,18 @@ intents = discord.Intents.all()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
+# Connect to the SQLite database (create it if it doesn't exist)
+conn = sqlite3.connect('message_data.db')
+cursor = conn.cursor()
+
+# Create a table to store message data if it doesn't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
+                    message_id INTEGER PRIMARY KEY,
+                    channel_id INTEGER,
+                    content TEXT
+                )''')
+conn.commit()
+
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,9 +56,10 @@ L = instaloader.Instaloader(
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
 COOLDOWN_DURATION = 1
+message_dict = {}
 
 
-COMMAND_PREFIX = "hn say "
+COMMAND_PREFIX = "hn "
 
 
 async def say_command(message):
@@ -66,10 +80,11 @@ async def say_command(message):
 
         if target_channel:
             # Send the message to the specified channel
-            await target_channel.send(input_text)
-
-            # Send a success message in the current channel
+            sent_message = await target_channel.send(input_text)
             await message.channel.send(f"Message sent to {target_channel.mention}.")
+
+            # Store the messageId in the dictionary
+            message_dict[message.id] = sent_message
             return
         else:
             # Send an error message if the specified channel does not exist
@@ -77,8 +92,11 @@ async def say_command(message):
             return
 
     # If no channel is specified or not found, send the message to the current channel
-    await message.channel.send(input_text)
+    sent_message = await message.channel.send(input_text)
     await message.channel.send("Message sent to this channel.")
+
+    # Store the messageId in the dictionary
+    message_dict[message.id] = sent_message
 
 
 # Function to generate a common browser user agent
@@ -305,10 +323,71 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-        # Check if the message starts with the command prefix
     if message.content.startswith(COMMAND_PREFIX):
-        await say_command(message)
-        return
+        command = message.content[len(COMMAND_PREFIX):].strip()
+
+        if command.startswith("say "):
+            command_args = command[len("say "):].strip().split(' ', 1)
+
+            if len(command_args) == 2:
+                channel_mention, message_content = command_args
+
+                if channel_mention.startswith("<#") and channel_mention.endswith(">"):
+                    channel_id = int(channel_mention[2:-1])
+                    target_channel = message.guild.get_channel(channel_id)
+                    if target_channel:
+                        sent_message = await target_channel.send(message_content)
+                        await message.channel.send(f"Message sent to {target_channel.mention}.")
+
+                        # Store the message data in the database
+                        cursor.execute("INSERT INTO messages (message_id, channel_id, content) VALUES (?, ?, ?)",
+                                       (sent_message.id, channel_id, message_content))
+                        conn.commit()
+                    else:
+                        await message.channel.send("Error: The specified channel does not exist.")
+                else:
+                    await message.channel.send("Error: Invalid channel mention format.")
+            else:
+                await message.channel.send("Error: Invalid command format. Use `hn say <#channel_mention> <message>`.")
+            return
+        elif command.startswith("edit "):
+            command_args = command[len("edit "):].strip().split(' ', 1)
+
+            if len(command_args) == 2:
+                message_id, new_content = command_args
+                try:
+                    message_id = int(message_id)
+                except ValueError:
+                    await message.channel.send("Error: Invalid message ID format.")
+                    return
+
+                # Check if the message exists in the database
+                cursor.execute(
+                    "SELECT channel_id FROM messages WHERE message_id=?", (message_id,))
+                result = cursor.fetchone()
+
+                if result:
+                    channel_id = result[0]
+                    target_channel = message.guild.get_channel(channel_id)
+                    if target_channel:
+                        # Edit the message using the message ID
+                        edited_message = await target_channel.fetch_message(message_id)
+                        await edited_message.edit(content=new_content)
+                        await message.channel.send(f"Message with ID {message_id} edited.")
+
+                        # Update the message content in the database
+                        cursor.execute(
+                            "UPDATE messages SET content=? WHERE message_id=?", (new_content, message_id))
+                        conn.commit()
+                    else:
+                        await message.channel.send("Error: The specified channel does not exist.")
+                else:
+                    await message.channel.send("Error: Message with that ID not found.")
+            else:
+                await message.channel.send("Error: Invalid command format. Use `hn edit <messageId> <new_content>`.")
+        else:
+            # Handle other commands here if needed
+            pass
 
     # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
     if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
@@ -366,6 +445,11 @@ async def on_ready():
     print(f'Logged in as {client.user.name}')
 
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
+
+
+@client.event
+async def on_disconnect():
+    conn.close()
 
 
 def run_discord_bot():
