@@ -332,28 +332,50 @@ async def on_message(message):
         command = message.content[len(COMMAND_PREFIX):].strip()
 
         if command.startswith("say "):
-            command_args = command[len("say "):].strip().split(' ', 1)
+            command_args = command[len("say "):].strip()
 
-            if len(command_args) == 2:
-                channel_mention, message_content = command_args
-
-                if channel_mention.startswith("<#") and channel_mention.endswith(">"):
-                    channel_id = int(channel_mention[2:-1])
-                    target_channel = message.guild.get_channel(channel_id)
-                    if target_channel:
-                        sent_message = await target_channel.send(message_content)
-                        await message.channel.send(f"Message sent to {target_channel.mention}.")
-
-                        # Store the message data in the database
-                        cursor.execute("INSERT INTO messages (message_id, channel_id, content) VALUES (?, ?, ?)",
-                                       (sent_message.id, channel_id, message_content))
-                        conn.commit()
+            if command_args:
+                # Check if there are any attachments (images) in the message
+                if message.attachments:
+                    # If there are attachments, send only the attached images
+                    channel_mention = command_args.split(' ', 1)[0]
+                    if channel_mention.startswith("<#") and channel_mention.endswith(">"):
+                        channel_id = int(channel_mention[2:-1])
+                        target_channel = message.guild.get_channel(channel_id)
+                        if target_channel:
+                            sent_messages = []
+                            for attachment in message.attachments:
+                                sent_message = await target_channel.send(file=await attachment.to_file())
+                                sent_messages.append(sent_message)
+                            await message.channel.send(f"Image(s) sent to {target_channel.mention}.")
+                        else:
+                            await message.channel.send("Error: The specified channel does not exist.")
                     else:
-                        await message.channel.send("Error: The specified channel does not exist.")
+                        await message.channel.send("Error: Invalid channel mention format.")
                 else:
-                    await message.channel.send("Error: Invalid channel mention format.")
+                    # If no attachments, send only the text
+                    command_parts = command_args.split(' ', 1)
+                    if len(command_parts) == 2:
+                        channel_mention, message_content = command_parts
+                        if channel_mention.startswith("<#") and channel_mention.endswith(">"):
+                            channel_id = int(channel_mention[2:-1])
+                            target_channel = message.guild.get_channel(
+                                channel_id)
+                            if target_channel:
+                                sent_message = await target_channel.send(message_content)
+                                await message.channel.send(f"Message sent to {target_channel.mention}.")
+                                cursor.execute("INSERT INTO messages (message_id, channel_id, content) VALUES (?, ?, ?)",
+                                               (sent_message.id, channel_id, message_content))
+                                conn.commit()
+                            else:
+                                await message.channel.send("Error: The specified channel does not exist.")
+                        else:
+                            await message.channel.send("Error: Invalid channel mention format.")
+                    else:
+                        await message.channel.send("Error: Invalid command format. Use `hn say <#channel_mention> <message>`.")
             else:
-                await message.channel.send("Error: Invalid command format. Use `hn say <#channel_mention> <message>`.")
+                await message.channel.send("Error: Invalid command format. Use `hn say <#channel_mention> <message>` or attach an image.")
+
             return
         elif command.startswith("edit "):
             command_args = command[len("edit "):].strip().split(' ', 1)
