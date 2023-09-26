@@ -217,4 +217,4 @@ async def hn_tweet_link(ctx, tweet_link):
             await ctx.send("Failed to fetch tweet data")
 
 # Run the bot with your token
-bot.run("MTE0NDgwOTk0NjExOTE0MzUzNQ.GekBmF.vxb8TsdwC5VvlsC5qqK7MvnrtgM5HbBYOqTWYI")
+bot.run("MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU")
