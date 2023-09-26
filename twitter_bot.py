@@ -21,6 +21,9 @@ translation_button_created_time = 0
 # Create a variable to store the timestamp when the "Jp/En" button was created
 jp_translation_button_created_time = 0
 
+# Create a dictionary to store the current translation state by message ID
+translation_states = {}
+
 
 async def fetch_media(url):
     # Determine the file extension based on URL content type
@@ -77,7 +80,7 @@ async def hn_tweet_link(ctx, tweet_link):
 
         x_emote_syntax = "<:x:1149749183755067513>"
 
-        # Combine the username, date, and caption
+        # Combine the username, date, and caption with a Translate button
         full_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n {tweet_caption}"
 
         # Get the original Twitter link without any query parameters
@@ -109,109 +112,60 @@ async def hn_tweet_link(ctx, tweet_link):
             # Add the "View Post" button to the view
             view.add_item(tweet_button)
 
-            # Create the Translation button conditionally
-            translation_button = None
-            translated = False  # Flag to track if translation is applied
+            # Create the Translate button conditionally
+            translate_button = Button(
+                style=discord.ButtonStyle.success, label="Translate Caption")
 
-            if any(char >= '가' and char <= '힣' for char in tweet_caption):
-                button_label = "Kr/En"
-                translation_button = Button(
-                    style=discord.ButtonStyle.success, label=button_label)
+            # Define a callback function for the Translate button
+            async def translate_callback(interaction):
+                await interaction.response.defer()
+                if ctx.message.id in translation_states:
+                    # Toggle the translation state
+                    translation_states[ctx.message.id] = not translation_states.get(
+                        ctx.message.id, False)
+                else:
+                    # Initialize the translation state
+                    translation_states[ctx.message.id] = True
 
-                # Define a callback function for the Translation button
-                async def translate_callback(interaction):
-                    nonlocal translated
-                    await interaction.response.defer()
+                if translation_states[ctx.message.id]:
+                    # Translate the caption
+                    translated_caption = translate(
+                        tweet_caption, "en", "auto")
+                    new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{translated_caption}"
+                else:
+                    # Use the original caption
+                    new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{tweet_caption}"
 
-                    if translated:
-                        # Revert to the original caption
-                        new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{tweet_caption}"
-                        button_label = "Translation"
-                    else:
-                        # Translate the caption
-                        translated_caption = translate(
-                            tweet_caption, "en", "auto")
-                        new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{translated_caption}"
-                        button_label = "Button expired"
+                await original_caption_message.edit(content=new_caption)
 
-                    # Update the message content and button label
-                    await original_caption_message.edit(content=new_caption)
-                    translation_button.label = button_label
-                    translated = not translated
+            # Add the callback to the Translate button
+            translate_button.callback = translate_callback
 
-                    # Disable the button
-                    translation_button.disabled = True
+            # Add the Translate button to the view
+            view.add_item(translate_button)
 
-                # Add the callback to the Translation button
-                translation_button.callback = translate_callback
+            # Send the original caption message with buttons as a reply to the user
+            original_caption_message = await ctx.send(f"{full_caption.strip()}", files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
 
-                # Add the Translation button to the view
-                view.add_item(translation_button)
+            # Delete the user's message containing the command
+            await ctx.message.delete()
 
-                # Create the Japanese translation button conditionally
-                jp_translation_button = None
-                jp_translated = False  # Flag to track if Japanese to English translation is applied
+            await asyncio.sleep(600)  # 10 minutes
 
-                if any(char >= 'あ' and char <= 'ん' for char in tweet_caption):
-                    button_label = "Jp/En"
-                    jp_translation_button = Button(
-                        style=discord.ButtonStyle.success, label=button_label)
-
-                    # Define a callback function for the Japanese to English Translation button
-                    async def jp_translate_callback(interaction):
-                        nonlocal jp_translated
-                        await interaction.response.defer()
-
-                        if jp_translated:
-                            # Revert to the original caption
-                            new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{tweet_caption}"
-                            button_label = "Jp/En"
-                        else:
-                            # Translate the Japanese caption to English
-                            jp_to_en_translated_caption = translate(
-                                tweet_caption, "en", "ja")
-                            new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{jp_to_en_translated_caption}"
-                            button_label = "Button expired"
-
-                        # Update the message content and button label
-                        await original_caption_message.edit(content=new_caption)
-                        jp_translation_button.label = button_label
-                        jp_translated = not jp_translated
-
-                        # Disable the button
-                        jp_translation_button.disabled = True
-
-                    # Add the callback to the Japanese to English Translation button
-                    jp_translation_button.callback = jp_translate_callback
-
-                    # Add the Japanese Translation button to the view
-                    view.add_item(jp_translation_button)
-
-                # Send the original caption message with buttons as a reply to the user
-                original_caption_message = await ctx.send(f"{full_caption.strip()}", files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
-
-                # Delete the user's message containing the command
-                await ctx.message.delete()
-
-                await asyncio.sleep(60)  # 10 minutes
-
-                # Disable and update the buttons after the specified time
-                if translation_button:
-                    translation_button.disabled = True
-                    await original_caption_message.edit(view=view)
-                if jp_translation_button:
-                    jp_translation_button.disabled = True
-                    await original_caption_message.edit(view=view)
-
-            else:
-                # Send an error message if there is no media
-                error_message = "There is no media in the tweet link."
-
-                # Send the same error message to the channel
-                await ctx.send(error_message)
+            # Disable and update the buttons after the specified time
+            translate_button.disabled = True
+            translate_button.label = "Button Expired"
+            await original_caption_message.edit(view=view)
 
         else:
-            await ctx.send("Failed to fetch tweet data")
+            # Send an error message if there is no media
+            error_message = "There is no media in the tweet link."
+
+            # Send the same error message to the channel
+            await ctx.send(error_message)
+
+    else:
+        await ctx.send("Failed to fetch tweet data")
 
 # Run the bot with your token
 bot.run("MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU")
