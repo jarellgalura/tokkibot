@@ -48,7 +48,7 @@ conn.commit()
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "jarellgalura_"  # Replace with your Instagram username
+INSTAGRAM_USERNAME = "jarellgalura_"
 
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
@@ -106,7 +106,6 @@ async def say_command(message):
 
 # Function to generate a common browser user agent
 
-
 def generate_browser_user_agent() -> str:
     return (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -132,6 +131,8 @@ def generate_browser_headers() -> Dict[str, Any]:
         'sec-fetch-mode': 'navigate',
         'sec-fetch-site': 'none',
         'sec-fetch-user': '?1',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
     }
     return headers
 
@@ -162,17 +163,6 @@ async def login_instagram():
                 # SMS is available as a 2FA method
                 phone_number = input('Enter your phone number for SMS 2FA: ')
                 L.two_factor_login_sms(phone_number)
-
-            elif '1' in available_methods:
-                # Email is available as a 2FA method
-                email = input('Enter your email for email 2FA: ')
-                L.two_factor_login_email(email)
-
-            elif '3' in available_methods:
-                # Authentication app (TOTP) is available as a 2FA method
-                otp_code = getpass.getpass(
-                    'Enter your authentication app OTP code: ')
-                L.two_factor_login_totp(otp_code)
 
             try:
                 L.save_session_to_file()
@@ -228,7 +218,6 @@ async def retrieve_instagram_media(message):
     instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
     caption_with_info = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{caption_without_hashtags}"
 
-    # Use the common browser headers
     headers = generate_browser_headers()
 
     async with aiohttp.ClientSession(headers=headers) as session:
