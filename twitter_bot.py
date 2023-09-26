@@ -79,9 +79,6 @@ async def hn_tweet_link(ctx, tweet_link):
 
             x_emote_syntax = "<:x:1149749183755067513>"
 
-            # Remove '#' from the caption
-            tweet_caption = re.sub(r'#\w+', '', tweet_caption)
-
             # Combine the username, date, and caption
             full_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n {tweet_caption}"
 
@@ -105,10 +102,13 @@ async def hn_tweet_link(ctx, tweet_link):
                 # Use asyncio.gather to download media files concurrently
                 media_files = await asyncio.gather(*[fetch_media(url) for url in media_files_urls])
 
-                # Create a link button to the original tweet
+                # Create a view to hold the buttons
                 view = View()
+
                 tweet_button = Button(
                     style=discord.ButtonStyle.link, label="View Post", url=original_link)
+
+                # Add the "View Post" button to the view
                 view.add_item(tweet_button)
 
                 # Create the Translation button conditionally
@@ -122,7 +122,6 @@ async def hn_tweet_link(ctx, tweet_link):
 
                     # Define a callback function for the Translation button
                     async def translate_callback(interaction):
-                        global translation_button_created_time  # Access the global variable
                         nonlocal translated
                         await interaction.response.defer()
 
@@ -142,14 +141,8 @@ async def hn_tweet_link(ctx, tweet_link):
                         translation_button.label = button_label
                         translated = not translated
 
-                        # Update the timestamp when the button was created
-                        translation_button_created_time = time.time()
-
-                        # Check if the time since the button was created exceeds 15 minutes
-                        if time.time() - translation_button_created_time > 900:
-                            translation_button.disabled = True  # Disable the button
-                        else:
-                            translation_button.disabled = False  # Enable the button
+                        # Disable the button
+                        translation_button.disabled = True
 
                     # Add the callback to the Translation button
                     translation_button.callback = translate_callback
@@ -168,7 +161,6 @@ async def hn_tweet_link(ctx, tweet_link):
 
                     # Define a callback function for the Japanese to English Translation button
                     async def jp_translate_callback(interaction):
-                        global jp_translation_button_created_time  # Access the global variable
                         nonlocal jp_translated
                         await interaction.response.defer()
 
@@ -188,14 +180,8 @@ async def hn_tweet_link(ctx, tweet_link):
                         jp_translation_button.label = button_label
                         jp_translated = not jp_translated
 
-                        # Update the timestamp when the button was created
-                        jp_translation_button_created_time = time.time()
-
-                        # Check if the time since the button was created exceeds 15 minutes
-                        if time.time() - jp_translation_button_created_time > 900:
-                            jp_translation_button.disabled = True  # Disable the button
-                        else:
-                            jp_translation_button.disabled = False  # Enable the button
+                        # Disable the button
+                        jp_translation_button.disabled = True
 
                     # Add the callback to the Japanese to English Translation button
                     jp_translation_button.callback = jp_translate_callback
@@ -209,6 +195,17 @@ async def hn_tweet_link(ctx, tweet_link):
                 # Delete the user's message containing the command
                 await ctx.message.delete()
 
+                # Schedule the removal of buttons after a certain time (e.g., 15 minutes)
+                await asyncio.sleep(600)  # 10 minutes
+
+                # Disable and update the buttons after the specified time
+                if translation_button:
+                    translation_button.disabled = True
+                    await original_caption_message.edit(view=view)
+                if jp_translation_button:
+                    jp_translation_button.disabled = True
+                    await original_caption_message.edit(view=view)
+
             else:
                 # Send an error message if there is no media
                 error_message = "There is no media in the tweet link."
@@ -220,4 +217,4 @@ async def hn_tweet_link(ctx, tweet_link):
             await ctx.send("Failed to fetch tweet data")
 
 # Run the bot with your token
-bot.run("MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU")
+bot.run("MTE0NDgwOTk0NjExOTE0MzUzNQ.GekBmF.vxb8TsdwC5VvlsC5qqK7MvnrtgM5HbBYOqTWYI")
