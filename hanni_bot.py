@@ -48,8 +48,7 @@ conn.commit()
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "jarellgalura_"
-
+INSTAGRAM_USERNAME = "ja.dmp_"
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
     filename_pattern="session-{username}", max_connection_attempts=1)
@@ -163,6 +162,17 @@ async def login_instagram():
                 # SMS is available as a 2FA method
                 phone_number = input('Enter your phone number for SMS 2FA: ')
                 L.two_factor_login_sms(phone_number)
+
+            elif '1' in available_methods:
+                # Email is available as a 2FA method
+                email = input('Enter your email for email 2FA: ')
+                L.two_factor_login_email(email)
+
+            elif '3' in available_methods:
+                # Authentication app (TOTP) is available as a 2FA method
+                otp_code = getpass.getpass(
+                    'Enter your authentication app OTP code: ')
+                L.two_factor_login_totp(otp_code)
 
             try:
                 L.save_session_to_file()
