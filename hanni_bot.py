@@ -130,8 +130,6 @@ def generate_browser_headers() -> Dict[str, Any]:
         'sec-fetch-mode': 'navigate',
         'sec-fetch-site': 'none',
         'sec-fetch-user': '?1',
-        'sec-fetch-site': 'same-origin',
-        'sec-fetch-mode': 'cors',
     }
     return headers
 
