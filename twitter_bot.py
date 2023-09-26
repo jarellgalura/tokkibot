@@ -51,104 +51,102 @@ async def hn_tweet_link(ctx, tweet_link):
     if tweet_link.startswith("x.com/"):
         tweet_link = tweet_link.replace("x.com/", "")
 
-    # Simulate typing while processing
-    async with ctx.typing():
-        # Make a request to the tweet data API
-        tweet_data_url = f"https://api.vxtwitter.com/{tweet_link}"
-        response = requests.get(tweet_data_url)
-        if response.status_code == 200:
-            tweet_data = response.json()
+    # Make a request to the tweet data API
+    tweet_data_url = f"https://api.vxtwitter.com/{tweet_link}"
+    response = requests.get(tweet_data_url)
+    if response.status_code == 200:
+        tweet_data = response.json()
 
-            # Extract media URLs (images and videos)
-            media_urls = tweet_data.get("mediaURLs", [])
-            video_urls = tweet_data.get("videoURLs", [])
+        # Extract media URLs (images and videos)
+        media_urls = tweet_data.get("mediaURLs", [])
+        video_urls = tweet_data.get("videoURLs", [])
 
-            # Get the username and date from the tweet data
-            username = tweet_data.get("user_screen_name", "UnknownUser")
-            date = tweet_data.get("date", "")
+        # Get the username and date from the tweet data
+        username = tweet_data.get("user_screen_name", "UnknownUser")
+        date = tweet_data.get("date", "")
 
-            # Format the date (assuming the input is in the format "Fri Sep 08 15:10:07 +0000 2023")
-            date_parts = date.split()
-            formatted_date = f"{date_parts[2]}/{date_parts[1][:3]}/{date_parts[5][2:]}"
+        # Format the date (assuming the input is in the format "Fri Sep 08 15:10:07 +0000 2023")
+        date_parts = date.split()
+        formatted_date = f"{date_parts[2]}/{date_parts[1][:3]}/{date_parts[5][2:]}"
 
-            # Get the caption of the tweet
-            tweet_caption = tweet_data.get("text", "No caption provided")
+        # Get the caption of the tweet
+        tweet_caption = tweet_data.get("text", "No caption provided")
 
-            # Remove the link at the end of the caption (if it exists)
-            tweet_caption = tweet_caption.split("https://t.co/")[0]
+        # Remove the link at the end of the caption (if it exists)
+        tweet_caption = tweet_caption.split("https://t.co/")[0]
 
-            x_emote_syntax = "<:x:1149749183755067513>"
+        x_emote_syntax = "<:x:1149749183755067513>"
 
-            # Combine the username, date, and caption
-            full_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n {tweet_caption}"
+        # Combine the username, date, and caption
+        full_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n {tweet_caption}"
 
-            # Get the original Twitter link without any query parameters
-            # Check if the link starts with "x.com/"
-            if tweet_link.startswith("x.com/"):
-                # If it starts with "x.com/", remove it and create the original_link
-                original_link = urljoin(
-                    "https://twitter.com/", tweet_link.replace('x.com/', ''))
-            else:
-                # If it starts with "https://twitter.com/", use it directly as the original_link
-                original_link = urljoin("https://twitter.com/", tweet_link)
+        # Get the original Twitter link without any query parameters
+        # Check if the link starts with "x.com/"
+        if tweet_link.startswith("x.com/"):
+            # If it starts with "x.com/", remove it and create the original_link
+            original_link = urljoin(
+                "https://twitter.com/", tweet_link.replace('x.com/', ''))
+        else:
+            # If it starts with "https://twitter.com/", use it directly as the original_link
+            original_link = urljoin("https://twitter.com/", tweet_link)
 
-            # Remove query parameters (everything after "?") from the original_link
-            original_link = original_link.split("?")[0]
+        # Remove query parameters (everything after "?") from the original_link
+        original_link = original_link.split("?")[0]
 
-            if media_urls or video_urls:
-                # Create a list of media file URLs to download concurrently
-                media_files_urls = media_urls + video_urls
+        if media_urls or video_urls:
+            # Create a list of media file URLs to download concurrently
+            media_files_urls = media_urls + video_urls
 
-                # Use asyncio.gather to download media files concurrently
-                media_files = await asyncio.gather(*[fetch_media(url) for url in media_files_urls])
+            # Use asyncio.gather to download media files concurrently
+            media_files = await asyncio.gather(*[fetch_media(url) for url in media_files_urls])
 
-                # Create a view to hold the buttons
-                view = View()
+            # Create a view to hold the buttons
+            view = View()
 
-                tweet_button = Button(
-                    style=discord.ButtonStyle.link, label="View Post", url=original_link)
+            tweet_button = Button(
+                style=discord.ButtonStyle.link, label="View Post", url=original_link)
 
-                # Add the "View Post" button to the view
-                view.add_item(tweet_button)
+            # Add the "View Post" button to the view
+            view.add_item(tweet_button)
 
-                # Create the Translation button conditionally
-                translation_button = None
-                translated = False  # Flag to track if translation is applied
+            # Create the Translation button conditionally
+            translation_button = None
+            translated = False  # Flag to track if translation is applied
 
-                if any(char >= '가' and char <= '힣' for char in tweet_caption):
-                    button_label = "Kr/En"
-                    translation_button = Button(
-                        style=discord.ButtonStyle.success, label=button_label)
+            if any(char >= '가' and char <= '힣' for char in tweet_caption):
+                button_label = "Kr/En"
+                translation_button = Button(
+                    style=discord.ButtonStyle.success, label=button_label)
 
-                    # Define a callback function for the Translation button
-                    async def translate_callback(interaction):
-                        nonlocal translated
-                        await interaction.response.defer()
+                # Define a callback function for the Translation button
+                async def translate_callback(interaction):
+                    nonlocal translated
+                    await interaction.response.defer()
 
-                        if translated:
-                            # Revert to the original caption
-                            new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{tweet_caption}"
-                            button_label = "Translation"
-                        else:
-                            # Translate the caption
-                            translated_caption = translate(
-                                tweet_caption, "en", "auto")
-                            new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{translated_caption}"
-                            button_label = "Original"
+                    if translated:
+                        # Revert to the original caption
+                        new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{tweet_caption}"
+                        button_label = "Translation"
+                    else:
+                        # Translate the caption
+                        translated_caption = translate(
+                            tweet_caption, "en", "auto")
+                        new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{translated_caption}"
+                        button_label = "Button expired"
 
-                        # Update the message content and button label
-                        await original_caption_message.edit(content=new_caption)
-                        translation_button.label = button_label
-                        translated = not translated
+                    # Update the message content and button label
+                    await original_caption_message.edit(content=new_caption)
+                    translation_button.label = button_label
+                    translated = not translated
 
-                        # Disable the button
-                        translation_button.disabled = True
+                    # Disable the button
+                    translation_button.disabled = True
 
-                    # Add the callback to the Translation button
-                    translation_button.callback = translate_callback
+                # Add the callback to the Translation button
+                translation_button.callback = translate_callback
 
-                    # Add the Translation button to the view
-                    view.add_item(translation_button)
+                # Add the Translation button to the view
+                view.add_item(translation_button)
 
                 # Create the Japanese translation button conditionally
                 jp_translation_button = None
@@ -173,7 +171,7 @@ async def hn_tweet_link(ctx, tweet_link):
                             jp_to_en_translated_caption = translate(
                                 tweet_caption, "en", "ja")
                             new_caption = f"{x_emote_syntax} **@{username}** `{formatted_date}`\n\n{jp_to_en_translated_caption}"
-                            button_label = "Original"
+                            button_label = "Button expired"
 
                         # Update the message content and button label
                         await original_caption_message.edit(content=new_caption)
@@ -195,8 +193,7 @@ async def hn_tweet_link(ctx, tweet_link):
                 # Delete the user's message containing the command
                 await ctx.message.delete()
 
-                # Schedule the removal of buttons after a certain time (e.g., 15 minutes)
-                await asyncio.sleep(600)  # 10 minutes
+                await asyncio.sleep(60)  # 10 minutes
 
                 # Disable and update the buttons after the specified time
                 if translation_button:
