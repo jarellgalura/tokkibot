@@ -193,7 +193,7 @@ async def hn_tweet_link(ctx, tweet_link):
                 # Delete the user's message containing the command
                 await ctx.message.delete()
 
-                await asyncio.sleep(60)  # 10 minutes
+                await asyncio.sleep(600)  # 10 minutes
 
                 # Disable and update the buttons after the specified time
                 if translation_button:
