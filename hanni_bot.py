@@ -52,6 +52,8 @@ INSTAGRAM_USERNAME = "jarellgalura_"
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
     filename_pattern="session-{username}")
+L.context.headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'}
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
 COOLDOWN_DURATION = 1
@@ -315,149 +317,11 @@ async def retrieve_instagram_media(message):
                 # Delete the original Instagram link message
                 await message.delete()
 
-    except instaloader.HTTPException as e:
-        if e.code == 403:
-            await message.channel.send("Received a 403 Forbidden error. Retrying without login session...")
-            # You can optionally add a delay here to avoid rate limiting
-            await asyncio.sleep(5)
+                await asyncio.sleep(600)  # 10 minutes
 
-            # Retry the Instagram retrieval without the login session
-            await retrieve_instagram_media_without_login(message)
-        else:
-            await message.channel.send(f"An error occurred: {e}")
-
-
-async def retrieve_instagram_media_without_login(message):
-    url = message.content.split()[0]
-    shortcode = url.split('/')[-2]
-
-    L = instaloader.Instaloader()
-    url = message.content.split()[0]
-    shortcode = url.split('/')[-2]
-
-    L = instaloader.Instaloader()
-
-    try:
-        post = instaloader.Post.from_shortcode(L.context, shortcode)
-
-        username = post.owner_username
-        post_date = post.date.strftime('%Y-%m-%d')
-        caption = post.caption if post.caption else "No caption available."
-
-        # Remove hashtags from the caption
-        caption_without_hashtags = re.sub(r'#\w+', '', caption).strip()
-
-        media_urls = []
-
-        if post.typename == 'GraphImage':
-            media_urls.append(post.url)
-        elif post.typename == 'GraphVideo':
-            media_urls.append(post.video_url)
-        elif post.typename == 'GraphSidecar':
-            for media in post.get_sidecar_nodes():
-                if media.is_video:
-                    media_urls.append(media.video_url)
-                else:
-                    media_urls.append(media.display_url)
-        elif post.typename in ['GraphStoryImage', 'GraphStoryVideo']:
-            media_urls.append(post.url)
-        elif post.typename == 'GraphReel':
-            if post.is_video:
-                media_urls.append(post.video_url)
-            else:
-                media_urls.append(post.url)
-
-        instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
-        caption_with_info = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{caption_without_hashtags}"
-
-        headers = generate_browser_headers()
-
-        async with aiohttp.ClientSession(headers=headers) as session:
-            # Display typing status while processing
-            async with message.channel.typing():
-                # Check if there is Korean text in the caption
-
-                translation_button = Button(
-                    style=discord.ButtonStyle.success, label="Translate Caption")
-
-                # Define a mutable list to store the 'translated' flag
-                translated = [False]
-
-                # Define a callback function for the Translate button
-                async def translate_callback(interaction):
-                    await interaction.response.defer()
-
-                    # Toggle the translation state
-                    translated[0] = not translated[0]
-
-                    if translated[0]:
-                        # Translate the caption
-                        translated_caption = mtranslate.translate(
-                            caption_without_hashtags, "en", "auto")
-                    else:
-                        # Use the original caption
-                        translated_caption = caption_without_hashtags
-
-                    # Create a new caption with the translated or original text
-                    new_caption = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{translated_caption}"
-
-                    # Update the message content and button label
-                    await original_message.edit(content=new_caption)
-                    translation_button.label = "Original" if translated[0] else "Kr/En"
-
-                # Add the callback to the Translation button
-                translation_button.callback = translate_callback
-
-                # Rest of your media retrieval and sending code
-                tasks = []
-                media_data_results = []
-
-                # Fetch media data concurrently
-                for media_url in media_urls:
-                    tasks.append(get_media_data(session, media_url))
-                media_data_results = await asyncio.gather(*tasks)
-
-                media_files = []
-                for index, media_data in enumerate(media_data_results, start=1):
-                    if media_data is None:
-                        await message.channel.send("An error occurred while retrieving media.")
-                        return
-
-                    # Convert HEIC to JPEG if the media is in HEIC format
-                    if os.path.splitext(urlparse(media_urls[index - 1]).path)[1].lower() == '.heic':
-                        media_data = await convert_heic_to_jpg(media_data)
-                        # Update the media URL to use the new JPEG format
-                        media_urls[index - 1] = media_urls[index -
-                                                           1].replace('.heic', '.jpg')
-
-                    with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
-                        tmp_file.write(media_data)
-                        tmp_file.seek(0)
-                        temp_path = os.path.join(tempfile.gettempdir(
-                        ), f'{index:02d}{os.path.splitext(urlparse(media_urls[index - 1]).path)[1]}')
-                        with open(temp_path, 'wb') as f:
-                            f.write(tmp_file.read())
-                        media_files.append(discord.File(temp_path))
-
-                # Construct the shortened link
-                shortened_link = urljoin(url, url.split('?')[0])
-
-                # Combine caption, shortened link, and media files
-                caption_message = f"{caption_with_info}"
-
-                view = View()
-                ig_button = Button(
-                    style=discord.ButtonStyle.link, label="View Post", url=shortened_link)  # Use discord.ButtonStyle.link
-                view.add_item(ig_button)
-
-                if translation_button:
-                    view.add_item(translation_button)
-
-                # Send media files along with caption and shortened link in a single message
-                original_message = await message.reply(content=caption_message, files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
-
-                # Delete the original Instagram link message
-                await message.delete()
+                # Disable and update the buttons after the specified time
+                translation_button.disabled = True
+                translation_button.label = "Button Expired"
 
     except instaloader.HTTPException as e:
         await message.channel.send(f"An error occurred: {e}")
