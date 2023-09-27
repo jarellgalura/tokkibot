@@ -7,7 +7,7 @@ import threading
 app = Flask(__name__)
 
 # Discord bot token and Spotify API credentials (use the same values as in hanni_spotify.py)
-TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9QUlB.UfLDKULtmSlbrb33YT1mCJ7n1sEb8puQobX_jI'
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU'
 SPOTIPY_CLIENT_ID = 'af74290356b04ceaa1d039600b12f93d'
 SPOTIPY_CLIENT_SECRET = 'c97a59c90e9c4449b3938cccd40a4f37'
 SPOTIPY_REDIRECT_URI = 'http://localhost:5000/callback'

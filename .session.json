@@ -1,0 +1,15 @@
+{
+    "authentication": {
+        "encrypted_token": null
+    },
+    "timezone": {
+        "offset": "-28800"
+    },
+    "device": {
+        "id": "android-95fd50132c458f0f",
+        "manufacturer": "OnePlus",
+        "model": "ONEPLUS+A3010",
+        "android_version": 25,
+        "android_release": "7.1.1"
+    }
+}
