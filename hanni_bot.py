@@ -51,7 +51,7 @@ INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
 INSTAGRAM_USERNAME = "jarellgalura"
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
-    filename_pattern="session-{username}")
+    filename_pattern="session-{username}", max_connection_attempts=1)
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
 COOLDOWN_DURATION = 1
