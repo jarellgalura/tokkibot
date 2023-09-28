@@ -48,7 +48,7 @@ conn.commit()
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "jarellgalura_"
+INSTAGRAM_USERNAME = "jarellgalura"
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
     filename_pattern="session-{username}")
