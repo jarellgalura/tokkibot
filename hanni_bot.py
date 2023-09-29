@@ -51,7 +51,7 @@ INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
 INSTAGRAM_USERNAME = "jarellgalura"
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
-    filename_pattern="session-{username}")
+    filename_pattern="session-{username}", max_connection_attempts=1)
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
 COOLDOWN_DURATION = 1
@@ -105,13 +105,21 @@ async def say_command(message):
 
 # Function to generate a common browser user agent
 
-def generate_browser_user_agent() -> str:
-    return (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/91.0.4472.124 Safari/537.36"
-    )
 
-# Function to generate browser headers
+def generate_browser_user_agent() -> str:
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36 Edg/91.0.864.48",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 OPR/76.0.4017.154",
+        "Mozilla/5.0 (Linux; Android 11; SM-G998U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 EdgA/91.0.864.48",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0.2",
+    ]
+    return random.choice(user_agents)
 
 
 def generate_browser_headers() -> Dict[str, Any]:
@@ -119,8 +127,9 @@ def generate_browser_headers() -> Dict[str, Any]:
         'User-Agent': generate_browser_user_agent(),
         'referer': 'https://www.instagram.com/',
         'authority': 'www.instagram.com',
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'accept-language': 'en-US,en;q=0.5',
+        'accept': '*/*',
+        'accept-language': 'en-US,en;q=0.9,ru;q=0.8',
+        'accept-encoding': 'gzip, deflate, br',
         'upgrade-insecure-requests': '1',
         'cache-control': 'max-age=0',
         'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="96", "Google Chrome";v="96"',
