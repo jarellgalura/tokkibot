@@ -48,7 +48,7 @@ conn.commit()
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "jarellgalura"
+INSTAGRAM_USERNAME = "praychandesu_"
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
     filename_pattern="session-{username}", max_connection_attempts=1)
@@ -105,33 +105,46 @@ async def say_command(message):
 
 # Function to generate a common browser user agent
 
-def generate_browser_user_agent() -> str:
-    return (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/91.0.4472.124 Safari/537.36"
-    )
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/117.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15"
+]
+
+
+def generate_random_user_agent():
+    return random.choice(user_agents)
 
 # Function to generate browser headers
 
 
 def generate_browser_headers() -> Dict[str, Any]:
     headers = {
-        'User-Agent': generate_browser_user_agent(),
-        'referer': 'https://www.instagram.com/',
-        'authority': 'www.instagram.com',
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'accept-language': 'en-US,en;q=0.5',
-        'upgrade-insecure-requests': '1',
-        'cache-control': 'max-age=0',
-        'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="96", "Google Chrome";v="96"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': 'Windows',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'none',
-        'sec-fetch-user': '?1',
+        'User-Agent': generate_random_user_agent(),
+        'Referer': 'https://www.instagram.com/',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
     }
     return headers
+
+
+# Persistent session handling
 
 
 async def login_instagram():
@@ -150,34 +163,14 @@ async def login_instagram():
             L.context.log(
                 "If you have chosen the 'Remember me' option while logging in, the session file will be created and you won't have to log in again next time.")
             pass
-        except TwoFactorAuthRequiredException as e:
-            L.context.log('Two-factor authentication required.')
+        except Exception as e:
+            L.context.log(f'Failed to log in: {e}')
 
-            # Check the available 2FA methods
-            available_methods = e.available_methods
+# Add a random delay between requests
 
-            if '0' in available_methods:
-                # SMS is available as a 2FA method
-                phone_number = input('Enter your phone number for SMS 2FA: ')
-                L.two_factor_login_sms(phone_number)
 
-            elif '1' in available_methods:
-                # Email is available as a 2FA method
-                email = input('Enter your email for email 2FA: ')
-                L.two_factor_login_email(email)
-
-            elif '3' in available_methods:
-                # Authentication app (TOTP) is available as a 2FA method
-                otp_code = getpass.getpass(
-                    'Enter your authentication app OTP code: ')
-                L.two_factor_login_totp(otp_code)
-
-            try:
-                L.save_session_to_file()
-                L.context.log('Logged in after 2FA.')
-            except Exception as e:
-                L.context.log(f'Failed to log in after 2FA: {e}')
-                time.sleep(5)
+async def random_request_delay():
+    await asyncio.sleep(random.uniform(2, 5))
 
 
 async def convert_heic_to_jpg(heic_data):
@@ -271,6 +264,7 @@ async def retrieve_instagram_media(message):
                 # Fetch media data concurrently
                 for media_url in media_urls:
                     tasks.append(get_media_data(session, media_url))
+                    await random_request_delay()
                 media_data_results = await asyncio.gather(*tasks)
 
                 media_files = []
