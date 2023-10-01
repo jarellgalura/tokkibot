@@ -19,6 +19,7 @@ from discord.ui import Button, View
 import aiohttp
 from datetime import datetime, timedelta
 import sqlite3
+import itertools
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -48,7 +49,7 @@ conn.commit()
 # Instantiate the TikTok class
 tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = ""
+INSTAGRAM_USERNAME = "praychandesu_"
 
 # Create an Instaloader context with the desired session file name
 L = instaloader.Instaloader(
@@ -122,9 +123,11 @@ user_agents = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15"
 ]
 
+user_agent_iterator = itertools.cycle(user_agents)
+
 
 def generate_random_user_agent():
-    return random.choice(user_agents)
+    return next(user_agent_iterator)
 
 # Function to generate browser headers
 
