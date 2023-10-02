@@ -1,33 +1,15 @@
-import mtranslate
 import asyncio
 import discord
 import instaloader
-import re
 import os
-from PIL import Image
-import io
-from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException
-import getpass
-import time
-import random
-import string
 import tempfile
-import uuid
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urljoin
 from typing import Dict, Any
 from discord.ui import Button, View
 from discord import File
-import aiohttp
 from datetime import datetime, timedelta
 import sqlite3
-import itertools
 import subprocess
-
-# Import the TikTok script
-from tiktok_bot import TikTok
-
-# Import the Instagram script
-from hanniinstagram import *
 
 # Your bot's token
 TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU'
@@ -48,10 +30,8 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
                 )''')
 conn.commit()
 
-# Instantiate the TikTok class
-tiktok = TikTok()
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "ja.dmp_"
+INSTAGRAM_USERNAME = "praychandesu"
 L = None
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
@@ -104,22 +84,6 @@ async def say_command(message):
     message_dict[message.id] = sent_message
 
 
-# Function to generate a common browser user agent
-
-user_agents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-]
-
-user_agent_iterator = itertools.cycle(user_agents)
-
-
-def generate_random_user_agent():
-    return next(user_agent_iterator)
-
-
 async def login_instagram():
     global L  # Make L a global variable to reuse the session
 
@@ -154,7 +118,9 @@ async def login_instagram():
 
 def generate_browser_headers() -> Dict[str, Any]:
     headers = {
-        'User-Agent': generate_random_user_agent(),
+        'User-Agent': (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:103.0) Gecko/20100101 Firefox/103.0"
+        ),
         'Referer': 'https://www.instagram.com/',
         'Accept': '*/*',
         'Accept-Language': 'en-US,en;q=0.5',
@@ -403,43 +369,6 @@ async def on_message(message):
         else:
             # Handle other commands here if needed
             pass
-
-    # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
-    if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
-        return
-
-    # Modified regex pattern
-    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^<> ]+'
-    tiktok_urls = re.findall(tiktok_pattern, message.content)
-
-    async with aiohttp.ClientSession() as session:
-        for tiktok_url in tiktok_urls:
-            try:
-                tiktok_video = await tiktok.get_video(tiktok_url)
-                video_content = await tiktok.download_video_content(tiktok_video.video_url, session)
-                async with message.channel.typing():
-                    # Create a temporary file using tempfile.NamedTemporaryFile
-                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
-                        temp_file.write(video_content)
-                        temp_file.seek(0)
-
-                        # Remove hashtags from the description
-                        description_without_hashtags = re.sub(
-                            r'#\w+', '', tiktok_video.description)
-
-                        # Create a File object from the temporary file
-                        video_file = discord.File(temp_file.name)
-                        tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
-                        response = (
-                            f"{tiktok_emote_syntax} **@{tiktok_video.user}**\n\n"
-                            f"{description_without_hashtags}"
-                        )
-
-                        # Send the response to the user without mentioning them
-                        await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
-                        await message.edit(suppress=True)
-            except Exception as e:
-                await message.channel.send(f"An error occurred: {e}")
 
     if 'instagram.com/reel/' in message.content:
         # Call the updated download_instagram_reel_with_caption function
