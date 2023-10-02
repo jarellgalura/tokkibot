@@ -188,7 +188,7 @@ async def convert_heic_to_jpg(heic_data):
         return tmp_file.read()
 
 
-async def download_instagram_reel(url):
+async def download_instagram_reel(url, headers):
     try:
         # Create a temporary directory to save the downloaded file
         temp_dir = tempfile.mkdtemp()
