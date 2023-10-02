@@ -1,104 +1,480 @@
+import mtranslate
+import asyncio
 import discord
-from discord.ext import commands
 import instaloader
-import requests
+import re
+import os
+from PIL import Image
+import io
+from instaloader.exceptions import TwoFactorAuthRequiredException, BadCredentialsException
+import getpass
+import time
+import random
+import string
+import tempfile
+import uuid
+from urllib.parse import urlparse, urljoin
+from typing import Dict, Any
+from discord.ui import Button, View
+from discord import File
+import aiohttp
+from datetime import datetime, timedelta
+import sqlite3
+import itertools
+import subprocess
 
-# Set your Discord bot token
-TOKEN = 'MTE0NDgwOTk0NjExOTE0MzUzNQ.GekBmF.vxb8TsdwC5VvlsC5qqK7MvnrtgM5HbBYOqTWYI'
+# Import the TikTok script
+from tiktok_bot import TikTok
 
-# Instagram credentials
-INSTAGRAM_USERNAME = 'ja.dmp_'
-INSTAGRAM_PASSWORD = 'jcdg120899'
+# Import the Instagram script
+from hanniinstagram import *
 
-# Create a Discord bot instance
+# Your bot's token
+TOKEN = 'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU'
+
 intents = discord.Intents.all()
-intents.members = True
-bot = commands.Bot(command_prefix="hn ", intents=intents)
+intents.message_content = True
+client = discord.Client(intents=intents)
 
-# Initialize the Instaloader instance for authentication
-instagram_loader = instaloader.Instaloader()
+# Connect to the SQLite database (create it if it doesn't exist)
+conn = sqlite3.connect('message_data.db')
+cursor = conn.cursor()
+
+# Create a table to store message data if it doesn't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
+                    message_id INTEGER PRIMARY KEY,
+                    channel_id INTEGER,
+                    content TEXT
+                )''')
+conn.commit()
+
+# Instantiate the TikTok class
+tiktok = TikTok()
+INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
+INSTAGRAM_USERNAME = "ja.dmp_"
+L = None
+
+user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
+COOLDOWN_DURATION = 1
+message_dict = {}
 
 
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user.name} - {bot.user.id}')
+COMMAND_PREFIX = "hn "
 
 
-@bot.command()
-async def instagram(ctx, post_url):
-    try:
-        # Construct the Instagram post URL
-        if not post_url.startswith('https://www.instagram.com/p/'):
-            await ctx.send('Invalid Instagram post URL.')
+async def say_command(message):
+    # Check if the user has the "Manage Channels" permission
+    if not message.author.guild_permissions.manage_channels:
+        await message.channel.send("You do not have permission to use this command.")
+        return
+
+    # Extract the content of the message after the "hn say" prefix
+    input_text = message.content[len(COMMAND_PREFIX):].strip()
+
+    # Check if the user has specified a target channel
+    if input_text.startswith("<#"):
+        # Find the channel mention
+        channel_mention = input_text.split()[0].strip()
+
+        # Remove the channel mention from the input text
+        input_text = input_text[len(channel_mention):].strip()
+
+        # Get the target channel from the mention
+        channel_id = int(channel_mention[2:-1])  # Extract the channel ID
+        target_channel = message.guild.get_channel(channel_id)
+
+        if target_channel:
+            # Send the message to the specified channel
+            sent_message = await target_channel.send(input_text)
+            await message.channel.send(f"Message sent to {target_channel.mention}.")
+
+            # Store the messageId in the dictionary
+            message_dict[message.id] = sent_message
+            return
+        else:
+            # Send an error message if the specified channel does not exist
+            await message.channel.send("Error: The specified channel does not exist.")
             return
 
-        # Extract the shortcode from the URL
-        shortcode = post_url.split('/')[-2]
+    # If no channel is specified or not found, send the message to the current channel
+    sent_message = await message.channel.send(input_text)
+    await message.channel.send("Message sent to this channel.")
 
-        # Login to Instagram (You can handle login exceptions here)
-        instagram_loader.load_session_from_file(INSTAGRAM_USERNAME)
+    # Store the messageId in the dictionary
+    message_dict[message.id] = sent_message
 
-        # Fetch post information using Instaloader
-        post = instaloader.Post.from_shortcode(
-            instagram_loader.context, shortcode)
 
-        if post:
-            # Extract image and video URLs
-            image_urls = []
-            video_urls = []
+# Function to generate a common browser user agent
 
-            if post.is_video:
-                video_urls.append(post.url)
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+]
+
+user_agent_iterator = itertools.cycle(user_agents)
+
+
+def generate_random_user_agent():
+    return next(user_agent_iterator)
+
+
+async def login_instagram():
+    global L  # Make L a global variable to reuse the session
+
+    try:
+        if L is None:
+            # Create a new Instaloader instance if not already created
+            L = instaloader.Instaloader(
+                filename_pattern="session-{username}", max_connection_attempts=1)
+
+        # Load or create a session
+        session_file_path = os.path.join(
+            INSTALOADER_SESSION_DIR, f"session-{INSTAGRAM_USERNAME}")
+        L.load_session_from_file(
+            INSTAGRAM_USERNAME, filename=session_file_path)
+
+        # Set custom browser headers
+        L.context.headers = generate_browser_headers()
+
+    except (FileNotFoundError, instaloader.exceptions.BadCredentialsException):
+        try:
+            L.context.log('Logging in with provided credentials.')
+            L.context.log("Session file does not exist yet - Logging in.")
+            L.context.log(
+                "If you have not logged in yet, you will be asked for your Instagram credentials.")
+            L.context.log(
+                "If you have chosen the 'Remember me' option while logging in, the session file will be created and you won't have to log in again next time.")
+        except Exception as e:
+            L.context.log(f'Failed to log in: {e}')
+
+    return L
+
+
+def generate_browser_headers() -> Dict[str, Any]:
+    headers = {
+        'User-Agent': generate_random_user_agent(),
+        'Referer': 'https://www.instagram.com/',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+    }
+    return headers
+
+
+async def download_instagram_reel(url):
+    try:
+        # Create a temporary directory to save the downloaded file
+        temp_dir = tempfile.mkdtemp()
+
+        # Use subprocess to run gallery-dl with the specified options
+        command = ['gallery-dl', '--cookies',
+                   './cookies-instagram-com.txt', '--directory', temp_dir, url]
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, error_output = process.communicate()
+
+        # Check if gallery-dl succeeded
+        if process.returncode == 0:
+            # Gallery-dl should have downloaded the file to the temporary directory
+            downloaded_files = [f for f in os.listdir(
+                temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]
+            if downloaded_files:
+                # Assuming the downloaded file is the first one in the list
+                downloaded_file = os.path.join(temp_dir, downloaded_files[0])
+                return downloaded_file
             else:
-                image_urls.append(post.url)
-
-            # Send the URLs to the Discord channel
-            if image_urls:
-                await ctx.send(f'Image URLs from the Instagram post:\n' + '\n'.join(image_urls))
-            if video_urls:
-                await ctx.send(f'Video URLs from the Instagram post:\n' + '\n'.join(video_urls))
+                return None
         else:
-            # If Instaloader fails to fetch data, use the original method
-            api_url = f'{post_url}?__a=1&__d=dis'
-            response = requests.get(api_url)
-
-            # Check if the response status code is 200 (OK)
-            if response.status_code == 200:
-                data = response.json()
-
-                if 'graphql' in data and 'shortcode_media' in data['graphql']:
-                    media_data = data['graphql']['shortcode_media']
-
-                    # Extract image and video URLs
-                    image_urls = []
-                    video_urls = []
-
-                    if 'edge_sidecar_to_children' in media_data:
-                        # If it's a carousel post with multiple images/videos
-                        carousel_media = media_data['edge_sidecar_to_children']['edges']
-                        for edge in carousel_media:
-                            if 'node' in edge and 'is_video' in edge['node']:
-                                video_urls.append(edge['node']['video_url'])
-                            elif 'node' in edge and 'display_url' in edge['node']:
-                                image_urls.append(edge['node']['display_url'])
-                    elif 'is_video' in media_data and media_data['is_video']:
-                        # If it's a video
-                        video_urls.append(media_data['video_url'])
-                    elif 'display_url' in media_data:
-                        # If it's a single image
-                        image_urls.append(media_data['display_url'])
-
-                    # Send the URLs to the Discord channel
-                    if image_urls:
-                        await ctx.send(f'Image URLs from the Instagram post:\n' + '\n'.join(image_urls))
-                    if video_urls:
-                        await ctx.send(f'Video URLs from the Instagram post:\n' + '\n'.join(video_urls))
-                else:
-                    await ctx.send('Unable to fetch data for the Instagram post.')
-            else:
-                await ctx.send(f'Failed to fetch data. Status Code: {response.status_code}')
+            return None
     except Exception as e:
-        await ctx.send(f'Error: {str(e)}')
+        print(f"Error downloading Instagram reel: {e}")
+        return None
 
-# Run the bot
-bot.run(TOKEN)
+
+async def download_instagram_reel_with_caption(message):
+    try:
+        # Extract the Instagram reel URL from the message content
+        url = message.content.split()[0]
+
+        async with message.channel.typing():
+
+            # Download the Instagram reel using gallery-dl
+            downloaded_file = await download_instagram_reel(url)
+
+            if downloaded_file:
+
+                # Create a discord.File object from the downloaded video file
+                video_file = discord.File(downloaded_file)
+                post = instaloader.Post.from_shortcode(
+                    L.context, url.split('/')[-2])
+                username = post.owner_username  # Get the username of the post owner
+                post_date = post.date.strftime('%Y-%m-%d')
+
+                instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
+
+                # Create a formatted message with username and caption
+                formatted_message = f"{instagram_emote_syntax} **@{username}** `{post_date}`"
+                shortened_link = urljoin(url, url.split('?')[0])
+                view = View()
+                ig_button = Button(
+                    style=discord.ButtonStyle.link, label="View Post", url=shortened_link)  # Use discord.ButtonStyle.link
+                view.add_item(ig_button)
+
+                # Send the formatted message along with the video file as one message
+                await message.reply(content=formatted_message, file=video_file, view=view, allowed_mentions=discord.AllowedMentions.none())
+
+                await message.delete()
+            else:
+                await message.channel.send("Failed to download Instagram reel.")
+    except Exception as e:
+        await message.channel.send(f"An error occurred: {e}")
+
+
+async def send_file_to_discord_channel(channel, file_path):
+    if file_path is not None:
+        with open(file_path, 'rb') as file:
+            discord_file = discord.File(file)
+            await channel.send(file=discord_file)
+        os.remove(file_path)
+
+
+async def download_instagram_media_with_gallery_dl(url):
+    try:
+        # Create a temporary directory to save the downloaded files
+        temp_dir = tempfile.mkdtemp()
+
+        # Use subprocess to run gallery-dl with the specified options
+        command = ['gallery-dl', '--cookies',
+                   './cookies-instagram-com.txt', '--directory', temp_dir, url]
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, error_output = process.communicate()
+
+        # Check if gallery-dl succeeded
+        if process.returncode == 0:
+            # Gallery-dl should have downloaded the files to the temporary directory
+            downloaded_files = [os.path.join(temp_dir, f) for f in os.listdir(
+                temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]
+
+            return downloaded_files
+        else:
+            return None
+    except Exception as e:
+        print(f"Error downloading Instagram media: {e}")
+        return None
+
+
+async def retrieve_instagram_media(message):
+    try:
+        url = message.content.split()[0]
+
+        # Show the "bot typing" indicator
+        async with message.channel.typing():
+            # Download all Instagram media using gallery-dl
+            downloaded_files = await download_instagram_media_with_gallery_dl(url)
+
+            if downloaded_files:
+                # Fetch the Instagram post using Instaloader
+                post = instaloader.Post.from_shortcode(
+                    L.context, url.split('/')[-2])
+                username = post.owner_username  # Get the username of the post owner
+                post_date = post.date.strftime('%Y-%m-%d')
+
+                media_files = [File(media_file_path)
+                               for media_file_path in downloaded_files]
+
+                # Create a shortened link to the original post
+                shortened_link = urljoin(url, url.split('?')[0])
+                instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
+
+                # Create a message with the media files, username, and a link to the original post
+                response_message = f"{instagram_emote_syntax} **@{username}** `{post_date}`"
+                view = View()
+                view.add_item(
+                    Button(style=1, label="View Post", url=shortened_link))
+
+                # Send all media files in one message along with the message and shortened link
+                await message.reply(content=response_message, files=media_files, view=view, allowed_mentions=discord.AllowedMentions.none())
+
+                # Delete the original Instagram link message
+                await message.delete()
+            else:
+                await message.channel.send("Failed to download Instagram media.")
+    except Exception as e:
+        await message.channel.send(f"An error occurred: {e}")
+
+
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
+
+    if message.content.startswith(COMMAND_PREFIX):
+        command = message.content[len(COMMAND_PREFIX):].strip()
+
+        if command.startswith("say "):
+            command_args = command[len("say "):].strip()
+
+            if command_args:
+                # Check if there are any attachments (images) in the message
+                if message.attachments:
+                    # If there are attachments, send only the attached images
+                    channel_mention = command_args.split(' ', 1)[0]
+                    if channel_mention.startswith("<#") and channel_mention.endswith(">"):
+                        channel_id = int(channel_mention[2:-1])
+                        target_channel = message.guild.get_channel(channel_id)
+                        if target_channel:
+                            sent_messages = []
+                            for attachment in message.attachments:
+                                sent_message = await target_channel.send(file=await attachment.to_file())
+                                sent_messages.append(sent_message)
+                            await message.channel.send(f"Image(s) sent to {target_channel.mention}.")
+                        else:
+                            await message.channel.send("Error: The specified channel does not exist.")
+                    else:
+                        await message.channel.send("Error: Invalid channel mention format.")
+                else:
+                    # If no attachments, send only the text
+                    command_parts = command_args.split(' ', 1)
+                    if len(command_parts) == 2:
+                        channel_mention, message_content = command_parts
+                        if channel_mention.startswith("<#") and channel_mention.endswith(">"):
+                            channel_id = int(channel_mention[2:-1])
+                            target_channel = message.guild.get_channel(
+                                channel_id)
+                            if target_channel:
+                                sent_message = await target_channel.send(message_content)
+                                await message.channel.send(f"Message sent to {target_channel.mention}.")
+                                cursor.execute("INSERT INTO messages (message_id, channel_id, content) VALUES (?, ?, ?)",
+                                               (sent_message.id, channel_id, message_content))
+                                conn.commit()
+                            else:
+                                await message.channel.send("Error: The specified channel does not exist.")
+                        else:
+                            await message.channel.send("Error: Invalid channel mention format.")
+                    else:
+                        await message.channel.send("Error: Invalid command format. Use `hn say <#channel_mention> <message>`.")
+            else:
+                await message.channel.send("Error: Invalid command format. Use `hn say <#channel_mention> <message>` or attach an image.")
+
+            return
+        elif command.startswith("edit "):
+            command_args = command[len("edit "):].strip().split(' ', 1)
+
+            if len(command_args) == 2:
+                message_id, new_content = command_args
+                try:
+                    message_id = int(message_id)
+                except ValueError:
+                    await message.channel.send("Error: Invalid message ID format.")
+                    return
+
+                # Check if the message exists in the database
+                cursor.execute(
+                    "SELECT channel_id FROM messages WHERE message_id=?", (message_id,))
+                result = cursor.fetchone()
+
+                if result:
+                    channel_id = result[0]
+                    target_channel = message.guild.get_channel(channel_id)
+                    if target_channel:
+                        # Edit the message using the message ID
+                        edited_message = await target_channel.fetch_message(message_id)
+                        await edited_message.edit(content=new_content)
+                        await message.channel.send(f"Message with ID {message_id} edited.")
+
+                        # Update the message content in the database
+                        cursor.execute(
+                            "UPDATE messages SET content=? WHERE message_id=?", (new_content, message_id))
+                        conn.commit()
+                    else:
+                        await message.channel.send("Error: The specified channel does not exist.")
+                else:
+                    await message.channel.send("Error: Message with that ID not found.")
+            else:
+                await message.channel.send("Error: Invalid command format. Use `hn edit <messageId> <new_content>`.")
+        else:
+            # Handle other commands here if needed
+            pass
+
+    # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
+    if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
+        return
+
+    # Modified regex pattern
+    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^<> ]+'
+    tiktok_urls = re.findall(tiktok_pattern, message.content)
+
+    async with aiohttp.ClientSession() as session:
+        for tiktok_url in tiktok_urls:
+            try:
+                tiktok_video = await tiktok.get_video(tiktok_url)
+                video_content = await tiktok.download_video_content(tiktok_video.video_url, session)
+                async with message.channel.typing():
+                    # Create a temporary file using tempfile.NamedTemporaryFile
+                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
+                        temp_file.write(video_content)
+                        temp_file.seek(0)
+
+                        # Remove hashtags from the description
+                        description_without_hashtags = re.sub(
+                            r'#\w+', '', tiktok_video.description)
+
+                        # Create a File object from the temporary file
+                        video_file = discord.File(temp_file.name)
+                        tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
+                        response = (
+                            f"{tiktok_emote_syntax} **@{tiktok_video.user}**\n\n"
+                            f"{description_without_hashtags}"
+                        )
+
+                        # Send the response to the user without mentioning them
+                        await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
+                        await message.edit(suppress=True)
+            except Exception as e:
+                await message.channel.send(f"An error occurred: {e}")
+
+    if 'instagram.com/reel/' in message.content:
+        # Call the updated download_instagram_reel_with_caption function
+        await download_instagram_reel_with_caption(message)
+
+    elif 'instagram.com/p/' in message.content:
+        user_id = message.author.id
+        current_time = datetime.now()
+
+        if user_id in user_last_link_time:
+            time_since_last_link = current_time - user_last_link_time[user_id]
+            if time_since_last_link < timedelta(seconds=COOLDOWN_DURATION):
+                await message.channel.send("Please wait before sending another link.")
+                return
+
+        user_last_link_time[user_id] = current_time
+        await retrieve_instagram_media(message)
+
+
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user.name}')
+
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Cake, Juice and Bread"))
+
+
+@client.event
+async def on_disconnect():
+    conn.close()
+
+
+def run_discord_bot():
+    asyncio.run(client.start(TOKEN))
+
+
+if __name__ == '__main__':
+    asyncio.run(login_instagram())
+    run_discord_bot()
