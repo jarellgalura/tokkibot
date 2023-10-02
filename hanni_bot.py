@@ -20,7 +20,6 @@ import aiohttp
 from datetime import datetime, timedelta
 import sqlite3
 import itertools
-import subprocess
 
 # Import the TikTok script
 from tiktok_bot import TikTok
@@ -175,7 +174,7 @@ async def login_instagram():
 
 
 async def random_request_delay():
-    await asyncio.sleep(random.uniform(1, 2))
+    await asyncio.sleep(random.uniform(2, 5))
 
 
 async def convert_heic_to_jpg(heic_data):
@@ -186,84 +185,6 @@ async def convert_heic_to_jpg(heic_data):
         img.save(tmp_file, "JPEG")
         tmp_file.seek(0)
         return tmp_file.read()
-
-
-async def download_instagram_reel(url, headers):
-    try:
-        # Create a temporary directory to save the downloaded file
-        temp_dir = tempfile.mkdtemp()
-
-        # Use subprocess to run gallery-dl with the specified options
-        command = ['gallery-dl', '--cookies',
-                   './cookies-instagram-com', '--directory', temp_dir, url]
-        process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _, error_output = process.communicate()
-
-        # Check if gallery-dl succeeded
-        if process.returncode == 0:
-            # Gallery-dl should have downloaded the file to the temporary directory
-            downloaded_files = [f for f in os.listdir(
-                temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]
-            if downloaded_files:
-                # Assuming the downloaded file is the first one in the list
-                downloaded_file = os.path.join(temp_dir, downloaded_files[0])
-                return downloaded_file
-            else:
-                return None
-        else:
-            return None
-    except Exception as e:
-        print(f"Error downloading Instagram reel: {e}")
-        return None
-
-
-async def download_instagram_reel_with_caption(message):
-    try:
-        # Extract the Instagram reel URL from the message content
-        url = message.content
-
-        headers = generate_browser_headers()
-
-        # Download the Instagram reel using gallery-dl
-        downloaded_file = await download_instagram_reel(url, headers)
-
-        if downloaded_file:
-            # Get additional information about the post
-            post = instaloader.Post.from_shortcode(
-                L.context, url.split('/')[-2])
-            username = post.owner_username
-            post_date = post.date.strftime('%Y-%m-%d')
-
-            # Create a discord.File object from the downloaded video file
-            video_file = discord.File(downloaded_file)
-
-            instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
-
-            # Create a formatted message with username and caption
-            formatted_message = f"{instagram_emote_syntax} **@{username}** `{post_date}`"
-            shortened_link = urljoin(url, url.split('?')[0])
-            view = View()
-            ig_button = Button(
-                style=discord.ButtonStyle.link, label="View Post", url=shortened_link)  # Use discord.ButtonStyle.link
-            view.add_item(ig_button)
-
-            # Send the formatted message along with the video file as one message
-            await message.reply(content=formatted_message, file=video_file, view=view, allowed_mentions=discord.AllowedMentions.none())
-
-            await message.delete()
-        else:
-            await message.channel.send("Failed to download Instagram reel.")
-    except Exception as e:
-        await message.channel.send(f"An error occurred: {e}")
-
-
-async def send_file_to_discord_channel(channel, file_path):
-    if file_path is not None:
-        with open(file_path, 'rb') as file:
-            discord_file = discord.File(file)
-            await channel.send(file=discord_file)
-        os.remove(file_path)
 
 
 async def retrieve_instagram_media(message):
@@ -294,6 +215,11 @@ async def retrieve_instagram_media(message):
                     media_urls.append(media.display_url)
         elif post.typename in ['GraphStoryImage', 'GraphStoryVideo']:
             media_urls.append(post.url)
+        elif post.typename == 'GraphReel':
+            if post.is_video:
+                media_urls.append(post.video_url)
+            else:
+                media_urls.append(post.url)
 
         instagram_emote_syntax = "<:instagram_icon:1144223792466513950>"
         caption_with_info = f"{instagram_emote_syntax} **@{username}** `{post_date}`\n\n{caption_without_hashtags}"
@@ -524,11 +450,7 @@ async def on_message(message):
             except Exception as e:
                 await message.channel.send(f"An error occurred: {e}")
 
-    if 'instagram.com/reel/' in message.content:
-        # Call the updated download_instagram_reel_with_caption function
-        await download_instagram_reel_with_caption(message)
-
-    elif 'instagram.com/p/' in message.content:
+    if 'instagram.com/p/' in message.content or 'instagram.com/reel/' in message.content:
         user_id = message.author.id
         current_time = datetime.now()
 
