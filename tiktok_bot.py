@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 import re
 from dataclasses import dataclass
 from typing import Dict, Tuple
-import requests
 import tempfile
+from discord.ui import Button, View
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -201,22 +201,16 @@ async def on_message(message):
                             f"{tiktok_emote_syntax} **@{tiktok_video.user}**\n\n"
                             f"{description_without_hashtags}"
                         )
+                        view = View()
+                        view.add_item(
+                            Button(style=1, label="View Post", url=tiktok_url))
 
                         # Send the response to the user without mentioning them
-                        await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
+                        await message.channel.send(response, file=video_file, view=view, reference=message, allowed_mentions=discord.AllowedMentions.none())
                         await message.delete()
             except Exception as e:
                 await message.channel.send(f"An error occurred: {e}")
 
 
-def shorten_url(long_url):
-    try:
-        response = requests.get(
-            f"http://tinyurl.com/api-create.php?url={long_url}")
-        return response.text
-    except requests.exceptions.RequestException:
-        return long_url
-
-
 client.run(
-    'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU')
+    'MTE0NDgwOTk0NjExOTE0MzUzNQ.GekBmF.vxb8TsdwC5VvlsC5qqK7MvnrtgM5HbBYOqTWYI')
