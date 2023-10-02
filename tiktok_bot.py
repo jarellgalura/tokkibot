@@ -171,7 +171,12 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    tiktok_pattern = r'https?://(?:www\.)?tiktok\.com/.+'
+    # Check if the raw content of the message contains a TikTok URL that starts with '<' and ends with '>'
+    if re.search(r'<https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^ ]+>', message.content):
+        return
+
+    # Modified regex pattern
+    tiktok_pattern = r'https?://(?:www\.|vm\.)?(?:tiktok\.com|vt\.tiktok\.com)/[^<> ]+'
     tiktok_urls = re.findall(tiktok_pattern, message.content)
 
     async with aiohttp.ClientSession() as session:
@@ -185,17 +190,21 @@ async def on_message(message):
                         temp_file.write(video_content)
                         temp_file.seek(0)
 
+                        # Remove hashtags from the description
+                        description_without_hashtags = re.sub(
+                            r'#\w+', '', tiktok_video.description)
+
                         # Create a File object from the temporary file
                         video_file = discord.File(temp_file.name)
                         tiktok_emote_syntax = "<:tiktok_icon:1144945709645299733>"
                         response = (
-                            f"{tiktok_emote_syntax} @{tiktok_video.user}\n\n"
-                            f"{tiktok_video.description}"
+                            f"{tiktok_emote_syntax} **@{tiktok_video.user}**\n\n"
+                            f"{description_without_hashtags}"
                         )
 
                         # Send the response to the user without mentioning them
                         await message.channel.send(response, file=video_file, reference=message, allowed_mentions=discord.AllowedMentions.none())
-
+                        await message.delete()
             except Exception as e:
                 await message.channel.send(f"An error occurred: {e}")
 
@@ -207,3 +216,7 @@ def shorten_url(long_url):
         return response.text
     except requests.exceptions.RequestException:
         return long_url
+
+
+client.run(
+    'MTE0NDE2NDM4ODE1NzI3MjEzNw.G9YrRY.4ZXmExNl6v5mzn5FHPmkEVLiIHWc1zxXVzQufU')
