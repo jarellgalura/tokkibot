@@ -370,6 +370,9 @@ async def on_message(message):
             # Handle other commands here if needed
             pass
 
+    if message.content.startswith("<") and message.content.endswith(">"):
+        return
+
     if 'instagram.com/reel/' in message.content:
         # Call the updated download_instagram_reel_with_caption function
         await download_instagram_reel_with_caption(message)
