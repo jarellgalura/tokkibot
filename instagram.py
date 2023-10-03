@@ -198,7 +198,7 @@ async def download_instagram_reel_with_caption(message):
 
                 await message.delete()
             else:
-                await message.channel.send("Failed to download Instagram reel.")
+                await message.channel.send("Meta! blocked me again.")
     except Exception as e:
         await message.channel.send(f"An error occurred: {e}")
 
@@ -371,6 +371,9 @@ async def on_message(message):
             pass
 
     if message.content.startswith("<") and message.content.endswith(">"):
+        return
+
+    if message.content.strip() and not message.content.startswith('http'):
         return
 
     if 'instagram.com/reel/' in message.content:
