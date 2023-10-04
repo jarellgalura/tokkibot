@@ -1,23 +1,21 @@
-import asyncio
+import threading
+import subprocess
 
 
-async def run_script(script):
-    await asyncio.create_subprocess_exec('python', script)
+def run_script(script):
+    subprocess.run(['python', script])
 
 
-async def main():
-    script1 = 'instagram.py'
-    script2 = 'tiktok_bot.py'
-    script3 = 'twitter_bot.py'
+script1 = 'tiktok_bot.py'
+script2 = 'twitter_bot.py'
 
-    tasks = [
-        run_script(script1),
-        run_script(script2),
-        run_script(script3),
-    ]
+thread1 = threading.Thread(target=run_script, args=(script1,))
+thread2 = threading.Thread(target=run_script, args=(script2,))
 
-    await asyncio.gather(*tasks)
+thread1.start()
+thread2.start()
 
-if __name__ == "__main__":
-    asyncio.run(main())
-    print("All three scripts have finished running.")
+thread1.join()
+thread2.join()
+
+print("All three scripts have finished running.")
