@@ -31,7 +31,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
 conn.commit()
 
 INSTALOADER_SESSION_DIR = os.path.dirname(os.path.abspath(__file__))
-INSTAGRAM_USERNAME = "ja.dmp_"
+INSTAGRAM_USERNAME = "praychandesu"
 L = None
 
 user_last_link_time = {}  # Define user_last_link_time and COOLDOWN_DURATION here
